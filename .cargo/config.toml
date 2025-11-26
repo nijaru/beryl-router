@@ -1,0 +1,16 @@
+# Cross-compilation configuration for Beryl AX (aarch64)
+
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-gnu-gcc"
+# Alternative: use zig for easier cross-compilation
+# linker = "zig cc -target aarch64-linux-musl"
+
+[target.bpfel-unknown-none]
+rustflags = ["-C", "link-arg=--btf"]
+
+[alias]
+xtask = "run --package xtask --"
+
+# For local development/testing
+[target.x86_64-unknown-linux-gnu]
+runner = "sudo -E"

@@ -1,0 +1,14 @@
+[package]
+name = "beryl-router-common"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+ebpf = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+
+[target.'cfg(not(target_arch = "bpf"))'.dependencies]
+serde = { version = "1", features = ["derive"] }

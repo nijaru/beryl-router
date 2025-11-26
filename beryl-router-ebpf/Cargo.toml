@@ -1,0 +1,39 @@
+[package]
+name = "beryl-router-ebpf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aya-ebpf = "0.1"
+aya-log-ebpf = "0.1"
+beryl-router-common = { path = "../beryl-router-common", features = ["ebpf"] }
+network-types = "0.0.7"
+
+[[bin]]
+name = "beryl-router-ebpf"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[workspace]
+# Prevent this from being a workspace member - it compiles to bpfel-unknown-none
