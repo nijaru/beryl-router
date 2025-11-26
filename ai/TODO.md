@@ -1,29 +1,39 @@
 # TODO
 
+## Phase 1: Core Infrastructure
+
+- [ ] Restructure workspace (see ai/design/SYSTEM.md)
+- [ ] Main daemon skeleton (beryl-routerd)
+- [ ] REST API with axum
+- [ ] eBPF loader/manager
+- [ ] nftables integration (NAT, port forwards)
+- [ ] Mode switching framework
+- [ ] TC-BPF program for egress
+
+## Phase 2: Network Services
+
+- [ ] DHCP server (use dhcproto crate)
+- [ ] DHCP client
+- [ ] DNS server (evaluate hickory-dns vs custom)
+- [ ] DNS blocklist filtering
+- [ ] Local hostname resolution
+
+## Phase 3: WiFi & Advanced
+
+- [ ] WiFi manager (hostapd wrapper)
+- [ ] AP mode implementation
+- [ ] Repeater mode implementation
+- [ ] WireGuard integration
+
+## Phase 4: Polish
+
+- [ ] CLI tool (beryl-cli)
+- [ ] Web UI (separate SPA)
+- [ ] OpenWrt image with BTF
+- [ ] Documentation
+
 ## Build System
 
 - [ ] Install `bpf-linker`: `cargo install bpf-linker`
-- [ ] Install cross-compiler: `brew install aarch64-elf-gcc` or use zig
-- [ ] Verify eBPF build: `cargo xtask build-ebpf`
-- [ ] Verify cross-compilation: `cargo xtask build --release`
-
-## OpenWrt Image
-
-- [ ] Clone OpenWrt: `git clone https://git.openwrt.org/openwrt/openwrt.git`
-- [ ] Configure for MT7981 with BTF (`CONFIG_DEBUG_INFO_BTF=y`)
-- [ ] Strip LuCI and unnecessary packages
-- [ ] Build and flash to Beryl AX
-
-## Features
-
-- [ ] Add TC-BPF program for egress filtering
-- [ ] Add rate limiting map
-- [ ] Add connection tracking (simple)
-- [ ] Add REST API for config (axum)
-- [ ] Add systemd/procd service file
-
-## Testing
-
-- [ ] Test on x86 VM with veth pairs
-- [ ] Test on actual Beryl AX hardware
-- [ ] Benchmark vs stock nftables
+- [ ] Verify eBPF build on Fedora
+- [ ] Cross-compilation for aarch64

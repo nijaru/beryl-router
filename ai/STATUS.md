@@ -4,11 +4,15 @@
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
+| System design | Complete | See ai/design/SYSTEM.md |
 | Project scaffold | Complete | Workspace with 3 crates |
-| eBPF program | Code complete | Needs build verification |
-| Userspace daemon | Code complete | Needs build verification |
+| XDP firewall | Code complete | Needs build verification |
+| TC-BPF egress | Not started | Phase 1 |
+| REST API | Not started | Phase 1 |
+| DHCP server/client | Not started | Phase 2 |
+| DNS server | Not started | Phase 2 |
+| WiFi manager | Not started | Phase 3 |
 | OpenWrt image | Not started | Requires custom build with BTF |
-| Hardware testing | Not started | Need Beryl AX device |
 
 ## Blockers
 
@@ -20,10 +24,12 @@
 
 ## Recent Commits
 
+- System design document for full router stack
 - Initial project scaffold with XDP/eBPF architecture
 
 ## Learnings
 
 - XDP is ingress-only; need TC-BPF for egress filtering
-- MediaTek HW flow offload may outperform XDP for simple NAT
-- `bpf-linker` required for eBPF compilation
+- MediaTek HW flow offload should coexist with XDP (don't replace NAT)
+- Use nftables for NAT/conntrack, XDP for fast-path filtering
+- WiFi requires hostapd + proprietary MT7976 drivers (OpenWrt only)
