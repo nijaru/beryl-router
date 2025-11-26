@@ -14,6 +14,7 @@
 
 | Blocker | Impact | Resolution |
 |---------|--------|------------|
+| aya requires Linux | Cannot build on macOS | Build on Fedora (nick@fedora) or Docker |
 | No BTF-enabled OpenWrt | Cannot test on device | Build custom image |
 | Cross-compiler needed | Cannot build for aarch64 | Install `aarch64-linux-gnu-gcc` |
 

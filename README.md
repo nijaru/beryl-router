@@ -12,9 +12,12 @@ XDP/eBPF firewall for GL.iNet Beryl AX (GL-MT3000) travel router.
 
 ### Build Host
 
+**Must build on Linux** - aya requires Linux kernel headers (netlink, bpf syscalls).
+
 - Rust nightly (`rustup default nightly`)
 - `bpf-linker` (`cargo install bpf-linker`)
 - Cross-compiler for aarch64 (`aarch64-linux-gnu-gcc` or zig)
+- Build on Linux (e.g., Fedora) or use Docker/Podman
 
 ### Router
 
