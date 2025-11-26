@@ -4,11 +4,16 @@
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| System design | Complete | See ai/design/SYSTEM.md |
-| Project scaffold | Complete | Workspace with 3 crates |
+| System design | Complete | ai/design/SYSTEM.md |
+| Crate restructure plan | Complete | ai/design/CRATES.md |
+| API design | Complete | ai/design/API.md |
+| Config schema | Complete | ai/design/CONFIG.md |
+| nftables design | Complete | ai/design/NFTABLES.md |
+| Flashing guide | Complete | ai/design/FLASHING.md |
+| Project scaffold | Complete | Needs restructure per CRATES.md |
 | XDP firewall | Code complete | Needs build verification |
-| TC-BPF egress | Not started | Phase 1 |
-| REST API | Not started | Phase 1 |
+| TC-BPF egress | Not started | Phase 1.5 |
+| REST API | Not started | Phase 1.7 |
 | DHCP server/client | Not started | Phase 2 |
 | DNS server | Not started | Phase 2 |
 | WiFi manager | Not started | Phase 3 |

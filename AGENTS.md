@@ -22,7 +22,12 @@ XDP/eBPF firewall and full router stack for GL.iNet Beryl AX (GL-MT3000) travel 
 - ai/KNOWLEDGE.md — Hardware quirks, eBPF gotchas
 
 **Reference files** (loaded on demand):
-- ai/design/ — System architecture, flashing guide
+- ai/design/SYSTEM.md — Full architecture, packet flow
+- ai/design/CRATES.md — Workspace restructure plan
+- ai/design/API.md — REST API endpoints
+- ai/design/CONFIG.md — TOML config schema
+- ai/design/NFTABLES.md — nftables integration
+- ai/design/FLASHING.md — Flashing, dev setup
 - ai/research/ — Detailed research
 - ai/decisions/ — Archived decisions
 - ai/tmp/ — Temporary artifacts (gitignored)
@@ -112,9 +117,21 @@ scp target/aarch64-unknown-linux-musl/release/beryl-routerd root@192.168.8.1:/tm
 | nick@fedora | Build host (Linux required for aya) |
 | nick@apple | SSH/testing, cannot build eBPF |
 
+## Getting Started (New Session)
+
+1. **Read** ai/STATUS.md (blockers, context)
+2. **Read** ai/TODO.md (find next task)
+3. **Reference** ai/design/*.md as needed
+4. **Build on Fedora** (nick@fedora) - aya requires Linux
+5. **First task:** Workspace restructure (ai/design/CRATES.md)
+
 ## Current Focus
 
 See ai/STATUS.md for current state, ai/TODO.md for task list.
 
-Full architecture: ai/design/SYSTEM.md
-Flashing guide: ai/design/FLASHING.md
+**Design docs ready for implementation:**
+- ai/design/CRATES.md — Workspace restructure (do first)
+- ai/design/CONFIG.md — Config types and schema
+- ai/design/API.md — REST endpoints
+- ai/design/NFTABLES.md — Firewall integration
+- ai/design/FLASHING.md — Hardware setup
