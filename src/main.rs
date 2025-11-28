@@ -23,6 +23,8 @@ use tokio::{
 use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod api;
+
 #[derive(Debug, Parser)]
 #[command(name = "beryl-routerd", about = "XDP/eBPF Firewall for Beryl AX")]
 struct Args {
@@ -41,15 +43,19 @@ struct Args {
     /// Statistics reporting interval in seconds
     #[arg(long, default_value = "10")]
     stats_interval: u64,
+
+    /// API server bind address
+    #[arg(long, default_value = "0.0.0.0:8080")]
+    api_bind: String,
 }
 
-struct Router {
+pub struct Router {
     ebpf: BerylEbpf,
     config_path: PathBuf,
 }
 
 impl Router {
-    fn new(args: &Args) -> Result<Self> {
+    pub fn new(args: &Args) -> Result<Self> {
         let mut ebpf = BerylEbpf::load()?;
 
         // Attach XDP (Ingress)
@@ -68,7 +74,7 @@ impl Router {
         })
     }
 
-    async fn load_config(&mut self) -> Result<()> {
+    pub async fn load_config(&mut self) -> Result<()> {
         let config: FirewallConfig = if self.config_path.exists() {
             let contents = fs::read_to_string(&self.config_path).await?;
             serde_json::from_str(&contents)?
@@ -81,7 +87,7 @@ impl Router {
         Ok(())
     }
 
-    fn apply_config(&mut self, config: &FirewallConfig) -> Result<()> {
+    pub fn apply_config(&mut self, config: &FirewallConfig) -> Result<()> {
         // Update IP blocklist (XDP Ingress)
         if let Some(map) = self.ebpf.get_map_mut("BLOCKLIST") {
              let mut blocklist: HashMap<_, u32, u32> = HashMap::try_from(map)?;
@@ -145,7 +151,7 @@ impl Router {
         Ok(())
     }
 
-    fn get_stats(&self) -> Result<Stats> {
+    pub fn get_stats(&self) -> Result<Stats> {
         let map = self.ebpf.get_map("STATS").context("STATS map not found")?;
         let stats: PerCpuArray<_, Stats> = PerCpuArray::try_from(map)?;
 
@@ -223,6 +229,18 @@ async fn main() -> Result<()> {
                 }
             }
         }
+    });
+
+    // API Server
+    let api_router = router.clone();
+    let api_bind = args.api_bind.clone();
+    tokio::spawn(async move {
+        let app_state = api::AppState { router: api_router };
+        let app = api::app(app_state);
+        
+        info!("API server listening on {}", api_bind);
+        let listener = tokio::net::TcpListener::bind(api_bind).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
     });
 
     // Config reload handler
