@@ -8,7 +8,7 @@ use aya_ebpf::{
     programs::XdpContext,
 };
 use aya_log_ebpf::info;
-use beryl_router_common::{PacketAction, Stats};
+use beryl_common::{PacketAction, Stats};
 use core::mem;
 use network_types::{
     eth::{EthHdr, EtherType},

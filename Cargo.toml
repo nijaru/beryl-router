@@ -1,6 +1,37 @@
+[package]
+name = "beryl-routerd"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "beryl-routerd"
+path = "src/main.rs"
+
+[dependencies]
+beryl-common = { path = "crates/beryl-common" }
+beryl-config = { path = "crates/beryl-config" }
+beryl-ebpf = { path = "crates/beryl-ebpf" }
+beryl-nft = { path = "crates/beryl-nft" }
+aya.workspace = true
+aya-log.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+notify.workspace = true
+serde_json.workspace = true
+
 [workspace]
 resolver = "2"
-members = ["beryl-router", "beryl-router-common", "xtask"]
+members = [
+    ".",
+    "crates/beryl-common",
+    "crates/beryl-config",
+    "crates/beryl-ebpf",
+    "crates/beryl-nft",
+    "xtask",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -19,6 +50,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 notify = "7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
+thiserror = "1"
 
 [profile.dev]
 opt-level = 3

@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 aya-ebpf = "0.1"
 aya-log-ebpf = "0.1"
-beryl-router-common = { path = "../beryl-router-common", features = ["ebpf"] }
+beryl-common = { path = "../crates/beryl-common", features = ["ebpf"] }
 network-types = "0.0.7"
 
 [[bin]]

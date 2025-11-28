@@ -82,7 +82,7 @@ fn build(opts: Build) -> Result<()> {
     cmd.current_dir(workspace_root())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .args(["build", "--package", "beryl-router"])
+        .args(["build", "--package", "beryl-routerd])
         .arg(format!("--target={}", opts.target));
 
     if opts.release {
@@ -96,7 +96,7 @@ fn build(opts: Build) -> Result<()> {
 
     println!("\nBuild complete!");
     println!(
-        "Binary: target/{}/{}/beryl-router",
+        "Binary: target/{}/{}/beryl-routerd,
         opts.target,
         if opts.release { "release" } else { "debug" }
     );

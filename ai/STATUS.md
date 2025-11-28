@@ -10,7 +10,7 @@
 | Config schema | Complete | ai/design/CONFIG.md |
 | nftables design | Complete | ai/design/NFTABLES.md |
 | Flashing guide | Complete | ai/design/FLASHING.md |
-| Project scaffold | Complete | Needs restructure per CRATES.md |
+| Project scaffold | In Progress | Restructuring per CRATES.md |
 | XDP firewall | Code complete | Needs build verification |
 | TC-BPF egress | Not started | Phase 1.5 |
 | REST API | Not started | Phase 1.7 |
@@ -29,6 +29,7 @@
 
 ## Recent Commits
 
+- chore: Initialize beads task tracking
 - System design document for full router stack
 - Initial project scaffold with XDP/eBPF architecture
 
@@ -46,3 +47,6 @@
 - Use nftables for NAT/conntrack, XDP for fast-path filtering
 - WiFi requires hostapd + proprietary MT7976 drivers (OpenWrt only)
 - U-Boot recovery (hold reset 10s) is safety net for bricking
+
+## Active Work
+Restructuring workspace to multi-crate architecture (CRATES.md).

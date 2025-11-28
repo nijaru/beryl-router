@@ -1,5 +1,5 @@
 [package]
-name = "beryl-router-common"
+name = "beryl-common"
 version.workspace = true
 edition.workspace = true
 

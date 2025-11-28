@@ -1,0 +1,11 @@
+[package]
+name = "beryl-ebpf"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+beryl-common = { path = "../beryl-common" }
+aya.workspace = true
+aya-log.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

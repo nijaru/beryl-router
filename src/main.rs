@@ -11,7 +11,7 @@ use aya::{
     Ebpf,
 };
 use aya_log::EbpfLogger;
-use beryl_router_common::{FirewallConfig, PacketAction, Stats};
+use beryl_common::{FirewallConfig, PacketAction, Stats};
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
 use std::{

@@ -1,0 +1,10 @@
+[package]
+name = "beryl-config"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+beryl-common = { path = "../beryl-common" }
+serde.workspace = true
+toml = "0.8"
+thiserror = "1"
