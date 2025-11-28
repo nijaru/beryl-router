@@ -65,6 +65,36 @@ The system consists of a userspace control daemon (`beryl-routerd`) and kernel-s
     - DHCP Server/Client implementation.
     - DNS Resolver implementation.
 
+## Handover Context (macOS → Linux)
+
+**Last Session Date:** 2025-11-28
+**Last Machine:** macOS (nick@apple)
+**Next Machine:** Linux (nick@fedora)
+
+### Immediate Actions Required
+
+1.  **Sync Code:**
+    ```bash
+    git pull
+    ```
+2.  **Verify Build (Linux):**
+    The eBPF build was skipped on macOS due to missing kernel headers. You must verify it compiles on Linux.
+    ```bash
+    cargo xtask build-ebpf
+    cargo check --workspace
+    ```
+3.  **Resume Work:**
+    We are starting **Phase 2: DHCP Server/Client**.
+    - Task ID: `beryl-router-j82` (in beads)
+    - Goal: Implement `dhcproto` based server/client in `crates/beryl-dhcp`.
+    - Reference: `ai/design/SYSTEM.md` (Service #2 and #3).
+
+### Active Task State
+- **Restructure:** Complete & Merged.
+- **TC-BPF:** Complete & Merged.
+- **API:** Complete & Merged.
+- **Next Task:** `beryl-router-j82` (Phase 2 DHCP) is currently **OPEN**.
+
 ## Development Constraints
 
 1.  **eBPF Build:** Requires **Linux** (for `aya` linking) and **Rust Nightly**.
