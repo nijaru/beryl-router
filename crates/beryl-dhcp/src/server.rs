@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, SocketAddr};
+use socket2::{Socket, Domain, Type, Protocol};
+use tokio::net::UdpSocket;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ServerConfig {
@@ -52,8 +54,31 @@ impl Server {
         
         tracing::info!("Starting DHCP Server on {}", self.config.interface);
         
-        // TODO: Bind socket and listen loop
+        let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+        socket.set_broadcast(true)?;
+        socket.set_reuse_address(true)?;
         
-        Ok(())
+        #[cfg(target_os = "linux")]
+        {
+            socket.bind_device(Some(self.config.interface.as_bytes()))?;
+        }
+        
+        socket.bind(&SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 67).into())?;
+        socket.set_nonblocking(true)?;
+        
+        let socket = UdpSocket::from_std(socket.into())?;
+        
+        let mut buf = [0u8; 1500];
+        loop {
+            match socket.recv_from(&mut buf).await {
+                Ok((len, addr)) => {
+                    tracing::debug!("Received {} bytes from {}", len, addr);
+                    // TODO: Parse packet
+                }
+                Err(e) => {
+                    tracing::error!("DHCP receive error: {}", e);
+                }
+            }
+        }
     }
 }
