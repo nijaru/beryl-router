@@ -8,6 +8,7 @@ use aya::maps::{HashMap, PerCpuArray};
 use beryl_common::{FirewallConfig, PacketAction, Stats};
 use beryl_config::Config;
 use beryl_dhcp::Server as DhcpServer;
+use beryl_dns::DnsServer;
 use beryl_ebpf::BerylEbpf;
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -55,6 +56,7 @@ pub struct Router {
     ebpf: BerylEbpf,
     config_path: PathBuf,
     dhcp_handle: Option<JoinHandle<()>>,
+    dns_handle: Option<JoinHandle<()>>,
     current_config: Option<Config>,
 }
 
@@ -74,6 +76,7 @@ impl Router {
             ebpf,
             config_path: args.config.clone(),
             dhcp_handle: None,
+            dns_handle: None,
             current_config: None,
         })
     }
@@ -88,6 +91,7 @@ impl Router {
 
         self.apply_firewall_config(&config.firewall)?;
         self.apply_dhcp_config(&config.dhcp).await?;
+        self.apply_dns_config(&config.dns).await?;
         
         self.current_config = Some(config);
         Ok(())
@@ -181,6 +185,27 @@ impl Router {
             }
         }
 
+        Ok(())
+    }
+
+    pub async fn apply_dns_config(&mut self, config: &beryl_config::DnsConfigWrapper) -> Result<()> {
+        if let Some(handle) = self.dns_handle.take() {
+            handle.abort();
+            info!("Stopped existing DNS server");
+        }
+
+        if let Some(server_config) = &config.server {
+            if server_config.enabled {
+                info!("Starting DNS server...");
+                let server = DnsServer::new(server_config.clone());
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = server.run().await {
+                        error!("DNS Server failed: {}", e);
+                    }
+                });
+                self.dns_handle = Some(handle);
+            }
+        }
         Ok(())
     }
 

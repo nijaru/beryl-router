@@ -11,6 +11,7 @@ path = "src/main.rs"
 beryl-common = { path = "crates/beryl-common", features = ["user"] }
 beryl-config = { path = "crates/beryl-config" }
 beryl-dhcp = { path = "crates/beryl-dhcp" }
+beryl-dns = { path = "crates/beryl-dns" }
 beryl-ebpf = { path = "crates/beryl-ebpf" }
 beryl-nft = { path = "crates/beryl-nft" }
 aya.workspace = true
@@ -33,6 +34,7 @@ members = [
     "crates/beryl-common",
     "crates/beryl-config",
     "crates/beryl-dhcp",
+    "crates/beryl-dns",
     "crates/beryl-ebpf",
     "crates/beryl-nft",
     "xtask",

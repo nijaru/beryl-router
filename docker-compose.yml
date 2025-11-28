@@ -1,0 +1,21 @@
+services:
+  dev:
+    build: 
+      context: .
+      args:
+        USER: ${USER:-beryl}
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    volumes:
+      - .:/home/${USER:-beryl}/project
+      # Persist cargo cache between runs
+      - cargo-cache:/home/${USER:-beryl}/.cargo/registry
+      - target-cache:/home/${USER:-beryl}/project/target
+    # Run indefinitely
+    command: tail -f /dev/null
+    # Enable detailed container output
+    tty: true
+
+volumes:
+  cargo-cache:
+  target-cache:

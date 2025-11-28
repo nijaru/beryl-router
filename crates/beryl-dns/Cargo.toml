@@ -1,0 +1,13 @@
+[package]
+name = "beryl-dns"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+serde.workspace = true
+hickory-server = "0.24"
+hickory-resolver = "0.24"
+beryl-common = { path = "../beryl-common" }

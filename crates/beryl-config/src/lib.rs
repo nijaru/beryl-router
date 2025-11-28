@@ -1,5 +1,6 @@
 use beryl_common::FirewallConfig;
 use beryl_dhcp::ServerConfig as DhcpServerConfig;
+use beryl_dns::DnsConfig;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -13,6 +14,8 @@ pub struct Config {
     pub firewall: FirewallConfig,
     #[serde(default)]
     pub dhcp: DhcpConfig,
+    #[serde(default)]
+    pub dns: DnsConfigWrapper,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -66,6 +69,12 @@ pub struct InterfaceConfig {
 pub struct DhcpConfig {
     #[serde(default)]
     pub server: Option<DhcpServerConfig>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DnsConfigWrapper {
+    #[serde(default)]
+    pub server: Option<DnsConfig>,
 }
 
 pub fn load_config<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {

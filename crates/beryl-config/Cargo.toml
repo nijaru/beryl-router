@@ -10,4 +10,5 @@ toml.workspace = true
 tracing.workspace = true
 beryl-common = { path = "../beryl-common", features = ["serde"] }
 beryl-dhcp = { path = "../beryl-dhcp" }
+beryl-dns = { path = "../beryl-dns" }
 thiserror = "1"
