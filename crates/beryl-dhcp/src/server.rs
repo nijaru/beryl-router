@@ -1,11 +1,11 @@
 use crate::database::LeaseDatabase;
-use dhcproto::{
-    v4, Decodable, Encodable, Encoder,
-};
+use dhcproto::{Decodable, Encodable, Encoder, v4};
 use serde::{Deserialize, Serialize};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{Ipv4Addr, SocketAddr};
-use socket2::{Socket, Domain, Type, Protocol};
+use std::sync::Arc;
 use tokio::net::UdpSocket;
+use tokio::sync::RwLock;
 
 use std::path::PathBuf;
 
@@ -46,12 +46,11 @@ pub struct StaticLease {
 
 pub struct Server {
     config: ServerConfig,
-    db: LeaseDatabase,
+    db: Arc<RwLock<LeaseDatabase>>,
 }
 
 impl Server {
-    pub fn new(config: ServerConfig) -> Self {
-        let db = LeaseDatabase::new(&config.pool, &config.static_leases, config.lease_file.clone());
+    pub fn new(config: ServerConfig, db: Arc<RwLock<LeaseDatabase>>) -> Self {
         Self { config, db }
     }
 
@@ -60,23 +59,23 @@ impl Server {
             tracing::info!("DHCP Server disabled");
             return Ok(());
         }
-        
+
         tracing::info!("Starting DHCP Server on {}", self.config.interface);
-        
+
         let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
         socket.set_broadcast(true)?;
         socket.set_reuse_address(true)?;
-        
+
         #[cfg(target_os = "linux")]
         {
             socket.bind_device(Some(self.config.interface.as_bytes()))?;
         }
-        
+
         socket.bind(&SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 67).into())?;
         socket.set_nonblocking(true)?;
-        
+
         let socket = UdpSocket::from_std(socket.into())?;
-        
+
         let mut buf = [0u8; 1500];
         loop {
             match socket.recv_from(&mut buf).await {
@@ -96,7 +95,7 @@ impl Server {
     async fn handle_packet(&mut self, buf: &[u8], socket: &UdpSocket) -> anyhow::Result<()> {
         let mut decoder = dhcproto::Decoder::new(buf);
         let msg = v4::Message::decode(&mut decoder)?;
-        
+
         // Only handle BootRequest (client to server)
         if msg.opcode() != v4::Opcode::BootRequest {
             return Ok(());
@@ -117,37 +116,55 @@ impl Server {
         }
     }
 
-    async fn handle_discover(&mut self, msg: &v4::Message, socket: &UdpSocket) -> anyhow::Result<()> {
+    async fn handle_discover(
+        &mut self,
+        msg: &v4::Message,
+        socket: &UdpSocket,
+    ) -> anyhow::Result<()> {
         let mac = msg.chaddr(); // Client MAC
-        let req_ip = msg.opts().get(v4::OptionCode::RequestedIpAddress).and_then(|opt| {
-            if let v4::DhcpOption::RequestedIpAddress(ip) = opt {
-                Some(*ip)
-            } else {
-                None
-            }
-        });
+        let req_ip = msg
+            .opts()
+            .get(v4::OptionCode::RequestedIpAddress)
+            .and_then(|opt| {
+                if let v4::DhcpOption::RequestedIpAddress(ip) = opt {
+                    Some(*ip)
+                } else {
+                    None
+                }
+            });
 
-        if let Some(lease) = self.db.allocate_ip(mac, req_ip) {
+        let mut db = self.db.write().await;
+        if let Some(lease) = db.allocate_ip(mac, req_ip) {
             tracing::info!("Offering IP {} to {:x?}", lease.ip, mac);
-            
+
             let mut offer = v4::Message::default();
             offer.set_opcode(v4::Opcode::BootReply);
             offer.set_xid(msg.xid());
             offer.set_yiaddr(lease.ip);
             offer.set_chaddr(mac);
             // offer.set_flags(msg.flags()); // Keep broadcast flag if present
-            
+
             // Options
-            offer.opts_mut().insert(v4::DhcpOption::MessageType(v4::MessageType::Offer));
-            offer.opts_mut().insert(v4::DhcpOption::ServerIdentifier(self.get_server_ip()));
-            offer.opts_mut().insert(v4::DhcpOption::AddressLeaseTime(self.db.get_duration().as_secs() as u32));
-            offer.opts_mut().insert(v4::DhcpOption::SubnetMask(Ipv4Addr::new(255, 255, 255, 0))); // TODO: Configurable mask
-            
+            offer
+                .opts_mut()
+                .insert(v4::DhcpOption::MessageType(v4::MessageType::Offer));
+            offer
+                .opts_mut()
+                .insert(v4::DhcpOption::ServerIdentifier(self.get_server_ip()));
+            offer.opts_mut().insert(v4::DhcpOption::AddressLeaseTime(
+                db.get_duration().as_secs() as u32,
+            ));
+            offer
+                .opts_mut()
+                .insert(v4::DhcpOption::SubnetMask(Ipv4Addr::new(255, 255, 255, 0))); // TODO: Configurable mask
+
             if let Some(gw) = self.config.options.gateway {
                 offer.opts_mut().insert(v4::DhcpOption::Router(vec![gw]));
             }
             if !self.config.options.dns.is_empty() {
-                offer.opts_mut().insert(v4::DhcpOption::DomainNameServer(self.config.options.dns.clone()));
+                offer.opts_mut().insert(v4::DhcpOption::DomainNameServer(
+                    self.config.options.dns.clone(),
+                ));
             }
 
             self.send_response(offer, socket).await?;
@@ -156,31 +173,39 @@ impl Server {
         Ok(())
     }
 
-    async fn handle_request(&mut self, msg: &v4::Message, socket: &UdpSocket) -> anyhow::Result<()> {
+    async fn handle_request(
+        &mut self,
+        msg: &v4::Message,
+        socket: &UdpSocket,
+    ) -> anyhow::Result<()> {
         let mac = msg.chaddr();
         // Check if this is a request for a specific IP
-        let req_ip = msg.opts().get(v4::OptionCode::RequestedIpAddress).and_then(|opt| {
-             if let v4::DhcpOption::RequestedIpAddress(ip) = opt {
-                Some(*ip)
+        let req_ip = msg
+            .opts()
+            .get(v4::OptionCode::RequestedIpAddress)
+            .and_then(|opt| {
+                if let v4::DhcpOption::RequestedIpAddress(ip) = opt {
+                    Some(*ip)
+                } else {
+                    None
+                }
+            });
+
+        // Or verify 'ciaddr' (client IP) for renewals
+        let target_ip = req_ip.or_else(|| {
+            if !msg.ciaddr().is_unspecified() {
+                Some(msg.ciaddr())
             } else {
                 None
             }
         });
-        
-        // Or verify 'ciaddr' (client IP) for renewals
-        let target_ip = req_ip.or_else(|| {
-             if !msg.ciaddr().is_unspecified() {
-                 Some(msg.ciaddr())
-             } else {
-                 None
-             }
-        });
 
         if let Some(ip) = target_ip {
-             // Verify we actually leased this IP to this MAC
-             // Simple check: re-allocate returns the same lease if exists
-             if let Some(lease) = self.db.allocate_ip(mac, Some(ip)) {
-                 if lease.ip == ip {
+            // Verify we actually leased this IP to this MAC
+            // Simple check: re-allocate returns the same lease if exists
+            let mut db = self.db.write().await;
+            if let Some(lease) = db.allocate_ip(mac, Some(ip)) {
+                if lease.ip == ip {
                     tracing::info!("ACKing IP {} for {:x?}", ip, mac);
 
                     let mut ack = v4::Message::default();
@@ -188,26 +213,38 @@ impl Server {
                     ack.set_xid(msg.xid());
                     ack.set_yiaddr(ip);
                     ack.set_chaddr(mac);
-                    
-                    ack.opts_mut().insert(v4::DhcpOption::MessageType(v4::MessageType::Ack));
-                    ack.opts_mut().insert(v4::DhcpOption::ServerIdentifier(self.get_server_ip()));
-                    ack.opts_mut().insert(v4::DhcpOption::AddressLeaseTime(self.db.get_duration().as_secs() as u32));
-                    ack.opts_mut().insert(v4::DhcpOption::SubnetMask(Ipv4Addr::new(255, 255, 255, 0)));
+
+                    ack.opts_mut()
+                        .insert(v4::DhcpOption::MessageType(v4::MessageType::Ack));
+                    ack.opts_mut()
+                        .insert(v4::DhcpOption::ServerIdentifier(self.get_server_ip()));
+                    ack.opts_mut().insert(v4::DhcpOption::AddressLeaseTime(
+                        db.get_duration().as_secs() as u32,
+                    ));
+                    ack.opts_mut()
+                        .insert(v4::DhcpOption::SubnetMask(Ipv4Addr::new(255, 255, 255, 0)));
 
                     if let Some(gw) = self.config.options.gateway {
                         ack.opts_mut().insert(v4::DhcpOption::Router(vec![gw]));
                     }
-                     if !self.config.options.dns.is_empty() {
-                        ack.opts_mut().insert(v4::DhcpOption::DomainNameServer(self.config.options.dns.clone()));
+                    if !self.config.options.dns.is_empty() {
+                        ack.opts_mut().insert(v4::DhcpOption::DomainNameServer(
+                            self.config.options.dns.clone(),
+                        ));
                     }
-                    
+
                     self.send_response(ack, socket).await?;
-                 } else {
-                     // NAK?
-                     tracing::warn!("Request for {} from {:x?} invalid (got {})", ip, mac, lease.ip);
-                     // Send NAK logic here
-                 }
-             }
+                } else {
+                    // NAK?
+                    tracing::warn!(
+                        "Request for {} from {:x?} invalid (got {})",
+                        ip,
+                        mac,
+                        lease.ip
+                    );
+                    // Send NAK logic here
+                }
+            }
         }
 
         Ok(())
@@ -217,16 +254,19 @@ impl Server {
         let mut buf = Vec::new();
         let mut encoder = Encoder::new(&mut buf);
         msg.encode(&mut encoder)?;
-        
+
         // Broadcast to 255.255.255.255 port 68
         let dest = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 68);
         socket.send_to(&buf, dest).await?;
-        
+
         Ok(())
     }
-    
+
     fn get_server_ip(&self) -> Ipv4Addr {
         // TODO: Get actual IP from interface or config
-        self.config.options.gateway.unwrap_or(Ipv4Addr::new(192, 168, 8, 1))
+        self.config
+            .options
+            .gateway
+            .unwrap_or(Ipv4Addr::new(192, 168, 8, 1))
     }
 }

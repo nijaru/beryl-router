@@ -1,6 +1,6 @@
 //! Build tasks for beryl-router eBPF programs.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use std::{
     env,
@@ -106,8 +106,5 @@ fn build(opts: Build) -> Result<()> {
 
 fn workspace_root() -> PathBuf {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(manifest_dir)
-        .parent()
-        .unwrap()
-        .to_path_buf()
+    PathBuf::from(manifest_dir).parent().unwrap().to_path_buf()
 }

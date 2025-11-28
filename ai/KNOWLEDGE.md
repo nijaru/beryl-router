@@ -12,6 +12,7 @@ Permanent quirks and gotchas for this project.
 | U-Boot | Recovery at 192.168.1.1, hold reset 10s | Safety net for bricked firmware | GL-iNet docs |
 | LED | Single RGB LED, controllable via GPIO | Can indicate status | OpenWrt |
 | Reset button | GPIO, can trigger events | Use for factory reset | OpenWrt |
+| Future Upgrade | GL-MT3600BE (Beryl 7) | Project should aim to support this future target | User Plan |
 
 ## eBPF/XDP
 

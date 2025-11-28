@@ -1,6 +1,6 @@
-pub mod server;
 pub mod client;
-pub mod packet;
 pub mod database;
+pub mod packet;
+pub mod server;
 
 pub use server::{Server, ServerConfig};

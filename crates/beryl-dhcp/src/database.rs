@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lease {
@@ -24,7 +24,11 @@ pub struct LeaseDatabase {
 }
 
 impl LeaseDatabase {
-    pub fn new(pool: &PoolConfig, static_leases: &[StaticLease], storage_path: Option<PathBuf>) -> Self {
+    pub fn new(
+        pool: &PoolConfig,
+        static_leases: &[StaticLease],
+        storage_path: Option<PathBuf>,
+    ) -> Self {
         let mut sl_map = HashMap::new();
         for sl in static_leases {
             if let Ok(mac_bytes) = parse_mac(&sl.mac) {
@@ -32,7 +36,8 @@ impl LeaseDatabase {
             }
         }
 
-        let lease_duration = parse_duration(&pool.lease_time).unwrap_or(Duration::from_secs(12 * 3600));
+        let lease_duration =
+            parse_duration(&pool.lease_time).unwrap_or(Duration::from_secs(12 * 3600));
 
         let mut db = Self {
             leases: HashMap::new(),
@@ -81,15 +86,19 @@ impl LeaseDatabase {
 
     pub fn allocate_ip(&mut self, mac: &[u8], requested_ip: Option<Ipv4Addr>) -> Option<Lease> {
         let lease = self.allocate_ip_internal(mac, requested_ip)?;
-        
+
         if let Err(e) = self.save() {
             tracing::error!("Failed to persist lease: {}", e);
         }
-        
+
         Some(lease)
     }
 
-    fn allocate_ip_internal(&mut self, mac: &[u8], requested_ip: Option<Ipv4Addr>) -> Option<Lease> {
+    fn allocate_ip_internal(
+        &mut self,
+        mac: &[u8],
+        requested_ip: Option<Ipv4Addr>,
+    ) -> Option<Lease> {
         // 1. Check static leases
         if let Some(&ip) = self.static_leases.get(mac) {
             let lease = Lease {
@@ -104,10 +113,10 @@ impl LeaseDatabase {
 
         // 2. Check existing lease
         if let Some(lease) = self.leases.get(mac) {
-             let mut new_lease = lease.clone();
-             new_lease.expires_at = SystemTime::now() + self.lease_duration;
-             self.leases.insert(mac.to_vec(), new_lease.clone());
-             return Some(new_lease);
+            let mut new_lease = lease.clone();
+            new_lease.expires_at = SystemTime::now() + self.lease_duration;
+            self.leases.insert(mac.to_vec(), new_lease.clone());
+            return Some(new_lease);
         }
 
         // 3. Allocate new dynamic IP
@@ -130,7 +139,7 @@ impl LeaseDatabase {
         for ip_u32 in self.pool_start..=self.pool_end {
             let ip = Ipv4Addr::from(ip_u32);
             if !self.is_ip_taken(ip) {
-                 let lease = Lease {
+                let lease = Lease {
                     ip,
                     mac: mac.to_vec(),
                     expires_at: SystemTime::now() + self.lease_duration,
@@ -146,7 +155,11 @@ impl LeaseDatabase {
 
     fn is_ip_taken(&self, ip: Ipv4Addr) -> bool {
         // Check active leases
-        if self.leases.values().any(|l| l.ip == ip && l.expires_at > SystemTime::now()) {
+        if self
+            .leases
+            .values()
+            .any(|l| l.ip == ip && l.expires_at > SystemTime::now())
+        {
             return true;
         }
         // Check static leases (reverse check)
@@ -155,14 +168,45 @@ impl LeaseDatabase {
         }
         false
     }
-    
+
     pub fn get_duration(&self) -> Duration {
         self.lease_duration
+    }
+
+    pub fn get_ip_by_hostname(&self, hostname: &str) -> Option<Ipv4Addr> {
+        // Check static leases
+        for lease in self.static_leases.iter() {
+            // Static leases map is MAC -> IP. We don't have hostname in the map value.
+            // We need to look up the original config or store hostname in static lease map.
+            // Current static_leases map is HashMap<Vec<u8>, Ipv4Addr>.
+            // We need to change the map value or iterate the source list if possible.
+            // But we don't have the source list here.
+            // Let's check dynamic/active leases first as they are full Lease objects.
+            if let Some(l) = self.leases.get(lease.0) {
+                if let Some(h) = &l.hostname {
+                    if h.eq_ignore_ascii_case(hostname) {
+                        return Some(l.ip);
+                    }
+                }
+            }
+        }
+
+        // Check all active leases
+        for lease in self.leases.values() {
+            if let Some(h) = &lease.hostname {
+                if h.eq_ignore_ascii_case(hostname) {
+                    return Some(lease.ip);
+                }
+            }
+        }
+
+        None
     }
 }
 
 fn parse_mac(s: &str) -> Result<Vec<u8>, ()> {
-    let bytes: Result<Vec<u8>, _> = s.split(':')
+    let bytes: Result<Vec<u8>, _> = s
+        .split(':')
         .map(|part| u8::from_str_radix(part, 16))
         .collect();
     bytes.map_err(|_| ())
@@ -171,7 +215,9 @@ fn parse_mac(s: &str) -> Result<Vec<u8>, ()> {
 fn parse_duration(s: &str) -> Option<Duration> {
     // Basic parsing: "12h", "30m", "60s"
     let len = s.len();
-    if len < 2 { return None; }
+    if len < 2 {
+        return None;
+    }
     let (val, unit) = s.split_at(len - 1);
     let val = val.parse::<u64>().ok()?;
     match unit {

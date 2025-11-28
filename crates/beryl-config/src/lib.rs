@@ -16,6 +16,45 @@ pub struct Config {
     pub dhcp: DhcpConfig,
     #[serde(default)]
     pub dns: DnsConfigWrapper,
+    #[serde(default)]
+    pub wifi: WifiConfig,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct WifiConfig {
+    pub radio0: Option<WifiRadioConfig>,
+    pub radio1: Option<WifiRadioConfig>,
+    #[serde(default)]
+    pub interfaces: Vec<WifiInterfaceConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WifiRadioConfig {
+    pub path: String,
+    #[serde(default = "default_channel")]
+    pub channel: String,
+    pub band: String,
+    #[serde(default = "default_htmode")]
+    pub htmode: String,
+    #[serde(default)]
+    pub disabled: bool,
+}
+
+fn default_channel() -> String {
+    "auto".to_string()
+}
+fn default_htmode() -> String {
+    "HE80".to_string()
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WifiInterfaceConfig {
+    pub device: String,
+    pub network: String,
+    pub mode: String,
+    pub ssid: String,
+    pub encryption: String,
+    pub key: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -27,8 +66,12 @@ pub struct SystemConfig {
     pub log_level: String,
 }
 
-fn default_timezone() -> String { "UTC".to_string() }
-fn default_log_level() -> String { "info".to_string() }
+fn default_timezone() -> String {
+    "UTC".to_string()
+}
+fn default_log_level() -> String {
+    "info".to_string()
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApiConfig {
@@ -61,7 +104,7 @@ pub struct InterfaceConfig {
     pub name: String,
     #[serde(rename = "type")]
     pub iface_type: Option<String>, // dhcp, static, pppoe (WAN only)
-    pub address: Option<String>, // CIDR (LAN only usually)
+    pub address: Option<String>,      // CIDR (LAN only usually)
     pub members: Option<Vec<String>>, // For bridge (LAN)
 }
 

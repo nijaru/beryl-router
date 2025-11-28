@@ -48,27 +48,37 @@ XDP/eBPF firewall and full router stack for GL.iNet Beryl AX (GL-MT3000) travel 
 
 ## Commands
 
+### Linux (Native)
 ```bash
-# Build eBPF program (Linux only)
+# Build eBPF program
 cargo xtask build-ebpf --release
 
 # Build userspace for router (cross-compile)
 cargo xtask build --release --target aarch64-unknown-linux-musl
 
-# Check workspace (won't fully compile on macOS)
-cargo check
-
 # Deploy to router
 scp target/aarch64-unknown-linux-musl/release/beryl-routerd root@192.168.8.1:/tmp/
 ```
 
+### macOS (Docker/OrbStack)
+```bash
+# Start development container
+docker compose up -d
+
+# Build everything (eBPF + Userspace)
+docker compose exec dev cargo xtask build --release --target aarch64-unknown-linux-musl
+
+# Drop into shell for iterative dev
+docker compose exec dev bash
+```
+
 ## Verification Steps
 
-| Check | Command | Notes |
-|-------|---------|-------|
-| Workspace check | `cargo check` | Fails on macOS (aya needs Linux) |
-| eBPF build | `cargo xtask build-ebpf` | Linux only, needs bpf-linker |
-| Cross-compile | `cargo xtask build --target aarch64-unknown-linux-musl` | Needs aarch64 linker |
+| Check | Native Command | Docker Command | Notes |
+|-------|----------------|----------------|-------|
+| Workspace check | `cargo check` | `docker compose exec dev cargo check` | Native fails on macOS (aya needs Linux) |
+| eBPF build | `cargo xtask build-ebpf` | `docker compose exec dev cargo xtask build-ebpf` | Requires bpf-linker |
+| Cross-compile | `cargo xtask build ...` | `docker compose exec dev cargo xtask build ...` | Target: aarch64-unknown-linux-musl |
 
 ## Code Standards
 
@@ -115,16 +125,18 @@ scp target/aarch64-unknown-linux-musl/release/beryl-routerd root@192.168.8.1:/tm
 
 | Machine | Role |
 |---------|------|
-| nick@fedora | Build host (Linux required for aya) |
-| nick@apple | SSH/testing, cannot build eBPF |
+| nick@fedora | Native Linux build (fastest for eBPF) |
+| nick@apple | macOS + OrbStack (Docker) for cross-compilation & eBPF |
 
 ## Getting Started (New Session)
 
 1. **Read** ai/STATUS.md (blockers, context)
 2. **Read** ai/TODO.md (find next task)
 3. **Reference** ai/design/*.md as needed
-4. **Build on Fedora** (nick@fedora) - aya requires Linux
-5. **First task:** Workspace restructure (ai/design/CRATES.md)
+4. **Select Environment:**
+   - **Linux:** Run native `cargo xtask` commands.
+   - **macOS:** Run `docker compose up -d` then use `docker compose exec dev ...`.
+5. **First task:** Check ai/TODO.md for active tasks.
 
 ## Current Focus
 

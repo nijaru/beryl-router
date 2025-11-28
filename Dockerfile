@@ -34,7 +34,8 @@ WORKDIR /home/${USER}/project
 
 # Install Rust Nightly (required for aya/eBPF)
 RUN rustup toolchain install nightly \
-    && rustup component add rust-src --toolchain nightly
+    && rustup default nightly \
+    && rustup component add rust-src
 
 # Install bpf-linker
 RUN cargo install bpf-linker

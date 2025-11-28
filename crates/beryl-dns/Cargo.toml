@@ -11,3 +11,5 @@ serde.workspace = true
 hickory-server = "0.24"
 hickory-resolver = "0.24"
 beryl-common = { path = "../beryl-common" }
+beryl-dhcp = { path = "../beryl-dhcp" }
+async-trait = "0.1.89"

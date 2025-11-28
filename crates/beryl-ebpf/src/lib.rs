@@ -1,10 +1,9 @@
+use anyhow::{Context, Result};
 use aya::{
-    include_bytes_aligned,
-    programs::{tc, SchedClassifier, TcAttachType},
-    Ebpf,
+    Ebpf, include_bytes_aligned,
+    programs::{SchedClassifier, TcAttachType, tc},
 };
 use aya_log::EbpfLogger;
-use anyhow::{Context, Result};
 use tracing::{info, warn};
 
 pub struct BerylEbpf {
@@ -33,7 +32,8 @@ impl BerylEbpf {
     }
 
     pub fn attach_xdp(&mut self, iface: &str, skb_mode: bool) -> Result<()> {
-        let program: &mut aya::programs::Xdp = self.ebpf
+        let program: &mut aya::programs::Xdp = self
+            .ebpf
             .program_mut("xdp_firewall")
             .context("XDP program not found")?
             .try_into()?;
@@ -48,8 +48,12 @@ impl BerylEbpf {
         program
             .attach(iface, flags)
             .context("Failed to attach XDP program")?;
-        
-        info!(iface, mode = if skb_mode { "SKB" } else { "Native" }, "XDP program attached");
+
+        info!(
+            iface,
+            mode = if skb_mode { "SKB" } else { "Native" },
+            "XDP program attached"
+        );
         Ok(())
     }
 
@@ -57,7 +61,8 @@ impl BerylEbpf {
         // Ensure qdisc exists (usually clsact)
         let _ = tc::qdisc_add_clsact(iface); // Ignore error if already exists
 
-        let program: &mut SchedClassifier = self.ebpf
+        let program: &mut SchedClassifier = self
+            .ebpf
             .program_mut("tc_egress")
             .context("TC egress program not found")?
             .try_into()?;
@@ -70,11 +75,11 @@ impl BerylEbpf {
         info!(iface, "TC egress program attached");
         Ok(())
     }
-    
+
     pub fn get_map_mut(&mut self, name: &str) -> Option<&mut aya::maps::Map> {
         self.ebpf.map_mut(name)
     }
-    
+
     pub fn get_map(&self, name: &str) -> Option<&aya::maps::Map> {
         self.ebpf.map(name)
     }

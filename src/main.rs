@@ -7,23 +7,19 @@ use anyhow::{Context, Result};
 use aya::maps::{HashMap, PerCpuArray};
 use beryl_common::{FirewallConfig, PacketAction, Stats};
 use beryl_config::Config;
-use beryl_dhcp::Server as DhcpServer;
+use beryl_dhcp::{Server as DhcpServer, database::LeaseDatabase};
 use beryl_dns::DnsServer;
 use beryl_ebpf::BerylEbpf;
+use beryl_wifi::apply_wifi_config;
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
-use std::{
-    net::Ipv4Addr,
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{net::Ipv4Addr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
     task::JoinHandle,
     time::interval,
 };
-use tracing::{debug, error, info, Level};
+use tracing::{Level, debug, error, info};
 use tracing_subscriber::FmtSubscriber;
 
 mod api;
@@ -58,6 +54,8 @@ pub struct Router {
     dhcp_handle: Option<JoinHandle<()>>,
     dns_handle: Option<JoinHandle<()>>,
     current_config: Option<Config>,
+    // Shared state between DHCP and DNS
+    lease_db: Option<Arc<RwLock<LeaseDatabase>>>,
 }
 
 impl Router {
@@ -66,7 +64,7 @@ impl Router {
 
         // Attach XDP (Ingress)
         ebpf.attach_xdp(&args.interface, args.skb_mode)?;
-        
+
         // Attach TC (Egress)
         if let Err(e) = ebpf.attach_tc_egress(&args.interface) {
             error!("Failed to attach TC egress: {}", e);
@@ -78,6 +76,7 @@ impl Router {
             dhcp_handle: None,
             dns_handle: None,
             current_config: None,
+            lease_db: None,
         })
     }
 
@@ -92,8 +91,17 @@ impl Router {
         self.apply_firewall_config(&config.firewall)?;
         self.apply_dhcp_config(&config.dhcp).await?;
         self.apply_dns_config(&config.dns).await?;
-        
+        self.apply_wifi_config(&config.wifi).await?;
+
         self.current_config = Some(config);
+        Ok(())
+    }
+
+    pub async fn apply_wifi_config(&mut self, config: &beryl_config::WifiConfig) -> Result<()> {
+        // WiFi config application is handled by the library (file generation + reload)
+        if let Err(e) = apply_wifi_config(config).await {
+            error!("Failed to apply WiFi config: {}", e);
+        }
         Ok(())
     }
 
@@ -104,7 +112,7 @@ impl Router {
     pub fn apply_firewall_config(&mut self, config: &FirewallConfig) -> Result<()> {
         // Update IP blocklist (XDP Ingress)
         if let Some(map) = self.ebpf.get_map_mut("BLOCKLIST") {
-             let mut blocklist: HashMap<_, u32, u32> = HashMap::try_from(map)?;
+            let mut blocklist: HashMap<_, u32, u32> = HashMap::try_from(map)?;
 
             // Clear existing entries
             let keys: Vec<u32> = blocklist.keys().filter_map(|k| k.ok()).collect();
@@ -136,17 +144,17 @@ impl Router {
                 debug!(port, "Added port to ingress blocklist");
             }
         }
-        
+
         // Update Egress blocklist (TC Egress)
         if let Some(map) = self.ebpf.get_map_mut("EGRESS_BLOCK") {
             let mut egress_block: HashMap<_, u32, u32> = HashMap::try_from(map)?;
-            
+
             let keys: Vec<u32> = egress_block.keys().filter_map(|k| k.ok()).collect();
             for key in keys {
                 let _ = egress_block.remove(&key);
             }
-            
-             for ip_str in &config.blocked_egress_ips {
+
+            for ip_str in &config.blocked_egress_ips {
                 if let Ok(ip) = ip_str.parse::<Ipv4Addr>() {
                     let ip_u32 = u32::from(ip);
                     egress_block.insert(ip_u32, PacketAction::Drop as u32, 0)?;
@@ -172,23 +180,41 @@ impl Router {
             info!("Stopped existing DHCP server");
         }
 
+        // Initialize shared lease DB if needed (or reuse existing if valid strategy)
+        // Ideally we keep the DB alive across reloads to persist leases in memory
+        // But if pool config changes drastically, we might need to re-init.
+        // For now, let's re-init if config exists.
+
         if let Some(server_config) = &config.server {
             if server_config.enabled {
+                // Create new DB instance based on new config
+                let db = Arc::new(RwLock::new(LeaseDatabase::new(
+                    &server_config.pool,
+                    &server_config.static_leases,
+                    server_config.lease_file.clone(),
+                )));
+                self.lease_db = Some(db.clone());
+
                 info!("Starting DHCP server on {}", server_config.interface);
-                let mut server = DhcpServer::new(server_config.clone());
+                let mut server = DhcpServer::new(server_config.clone(), db);
                 let handle = tokio::spawn(async move {
                     if let Err(e) = server.run().await {
                         error!("DHCP Server failed: {}", e);
                     }
                 });
                 self.dhcp_handle = Some(handle);
+            } else {
+                self.lease_db = None;
             }
         }
 
         Ok(())
     }
 
-    pub async fn apply_dns_config(&mut self, config: &beryl_config::DnsConfigWrapper) -> Result<()> {
+    pub async fn apply_dns_config(
+        &mut self,
+        config: &beryl_config::DnsConfigWrapper,
+    ) -> Result<()> {
         if let Some(handle) = self.dns_handle.take() {
             handle.abort();
             info!("Stopped existing DNS server");
@@ -196,14 +222,28 @@ impl Router {
 
         if let Some(server_config) = &config.server {
             if server_config.enabled {
-                info!("Starting DNS server...");
-                let server = DnsServer::new(server_config.clone());
-                let handle = tokio::spawn(async move {
-                    if let Err(e) = server.run().await {
-                        error!("DNS Server failed: {}", e);
-                    }
-                });
-                self.dns_handle = Some(handle);
+                // Need lease DB for local resolution
+                if let Some(db) = &self.lease_db {
+                    info!("Starting DNS server...");
+                    // Determine local domain from DHCP config if available?
+                    // Ideally DNS config should have it or we grab from DHCP options.
+                    // For now, pass None or "lan"
+                    let local_domain = Some("lan".to_string());
+
+                    let server = DnsServer::new(server_config.clone(), db.clone(), local_domain);
+                    let handle = tokio::spawn(async move {
+                        if let Err(e) = server.run().await {
+                            error!("DNS Server failed: {}", e);
+                        }
+                    });
+                    self.dns_handle = Some(handle);
+                } else {
+                    tracing::warn!(
+                        "DNS Server enabled but DHCP (and Lease DB) is not initialized. Local resolution will fail."
+                    );
+                    // We could start it without local resolution, but for now let's skip or start with empty DB?
+                    // Or just don't start.
+                }
             }
         }
         Ok(())
@@ -295,7 +335,7 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         let app_state = api::AppState { router: api_router };
         let app = api::app(app_state);
-        
+
         info!("API server listening on {}", api_bind);
         let listener = tokio::net::TcpListener::bind(api_bind).await.unwrap();
         axum::serve(listener, app).await.unwrap();

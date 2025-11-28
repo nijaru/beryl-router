@@ -1,9 +1,5 @@
-use axum::{
-    extract::{State},
-    routing::{get},
-    Json, Router,
-};
-use beryl_common::{Stats};
+use axum::{Json, Router, extract::State, routing::get};
+use beryl_common::Stats;
 use beryl_config::Config;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -68,21 +64,18 @@ async fn get_config(State(state): State<AppState>) -> Json<Option<Config>> {
     Json(router.get_current_config())
 }
 
-async fn put_config(
-    State(state): State<AppState>,
-    Json(config): Json<Config>,
-) -> Json<Config> {
+async fn put_config(State(state): State<AppState>, Json(config): Json<Config>) -> Json<Config> {
     let mut router = state.router.write().await;
-    
+
     if let Err(e) = router.apply_firewall_config(&config.firewall) {
         tracing::error!("Failed to apply firewall config: {}", e);
     }
     if let Err(e) = router.apply_dhcp_config(&config.dhcp).await {
         tracing::error!("Failed to apply DHCP config: {}", e);
     }
-    
+
     // Note: We are not persisting the config to file here yet.
     // It will be lost on restart.
-    
+
     Json(config)
 }

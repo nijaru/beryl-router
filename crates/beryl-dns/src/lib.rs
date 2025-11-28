@@ -1,5 +1,5 @@
-pub mod server;
 pub mod resolver;
+pub mod server;
 
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -11,21 +11,4 @@ pub struct DnsConfig {
     pub upstream: Vec<SocketAddr>,
 }
 
-pub struct DnsServer {
-    config: DnsConfig,
-}
-
-impl DnsServer {
-    pub fn new(config: DnsConfig) -> Self {
-        Self { config }
-    }
-
-    pub async fn run(&self) -> anyhow::Result<()> {
-        if !self.config.enabled {
-            return Ok(());
-        }
-        tracing::info!("Starting DNS Server...");
-        // TODO: Implement using hickory-server
-        Ok(())
-    }
-}
+pub use server::DnsServer;

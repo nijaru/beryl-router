@@ -14,9 +14,10 @@
 | XDP firewall | Code complete | Ingress filtering (Blocklist/Ports) |
 | TC-BPF egress | Code complete | Egress filtering (Phase 1.5) |
 | REST API | Code complete | Status, Stats, Config endpoints (Phase 1.7) |
-| DHCP server/client | In progress | Server logic complete, persistence added |
-| DNS server | Started | Phase 2 started; skeleton crate created |
-| WiFi manager | Not started | Phase 3 |
+| DHCP server/client | Code complete | Server logic, persistence, integration |
+| DNS server | Code complete | Forwarding + Local Hostname resolution |
+| Local DNS | Code complete | Resolves names from DHCP leases |
+| WiFi manager | Code complete | Generates OpenWrt config + reload |
 | OpenWrt image | Not started | Requires custom build with BTF |
 
 ## Blockers
@@ -27,10 +28,10 @@
 
 ## Recent Commits
 
-- feat: Implement DHCP server logic using dhcproto
-- feat: Implement DHCP lease persistence
-- feat: Add Dockerfile for native Mac aarch64 dev
-- feat: Start Phase 2 (DNS skeleton)
+- feat: Implement DNS server (forwarding) using hickory-dns
+- feat: Implement Local DNS resolution via shared lease DB
+- feat: Implement WiFi management (OpenWrt config generation)
+- infra: Fix Docker dev environment for macOS
 
 ## User Context
 
@@ -46,9 +47,10 @@
 - Use nftables for NAT/conntrack, XDP for fast-path filtering
 - WiFi requires hostapd + proprietary MT7976 drivers (OpenWrt only)
 - U-Boot recovery (hold reset 10s) is safety net for bricking
-- Nightly Rust is required for `beryl-router-ebpf` (build-std), but userspace can be stable.
-- `bpf-linker` is required for `cargo xtask build-ebpf` on Linux.
-- Docker on Apple Silicon is an efficient way to build native aarch64 binaries for the router.
+- Nightly Rust is required for `beryl-router-ebpf` (build-std).
+- `bpf-linker` requires specific rustc version matching the linker; updated Dockerfile to use nightly default.
+- Docker on Apple Silicon with `rust:nightly` is effective for building aarch64 binaries.
+- OpenWrt WiFi control is best done via generating `/etc/config/wireless` and calling `/sbin/wifi reload` rather than fighting netifd.
 
 ## Active Work
-Phase 2: DNS Server implementation (crates/beryl-dns).
+Next Phase: Building the OpenWrt Image (Phase 4).
