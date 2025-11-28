@@ -13,3 +13,4 @@ socket2 = { version = "0.5", features = ["all"] }
 libc = "0.2"
 ipnet = "2.9"
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

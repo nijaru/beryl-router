@@ -72,10 +72,10 @@
 
 ### 2.1 DHCP Server
 - [x] Add crates/beryl-dhcp
-- [ ] Use dhcproto for packet parsing
-- [ ] IP pool management
+- [x] Use dhcproto for packet parsing
+- [x] IP pool management
 - [ ] Lease storage (persist to file)
-- [ ] Static lease support
+- [x] Static lease support
 - [ ] Integrate with DNS (hostname → IP)
 
 ### 2.2 DHCP Client

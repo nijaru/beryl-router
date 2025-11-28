@@ -7,6 +7,8 @@ use std::net::{Ipv4Addr, SocketAddr};
 use socket2::{Socket, Domain, Type, Protocol};
 use tokio::net::UdpSocket;
 
+use std::path::PathBuf;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ServerConfig {
     pub enabled: bool,
@@ -15,6 +17,7 @@ pub struct ServerConfig {
     pub options: OptionsConfig,
     #[serde(default)]
     pub static_leases: Vec<StaticLease>,
+    pub lease_file: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -48,7 +51,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(config: ServerConfig) -> Self {
-        let db = LeaseDatabase::new(&config.pool, &config.static_leases);
+        let db = LeaseDatabase::new(&config.pool, &config.static_leases, config.lease_file.clone());
         Self { config, db }
     }
 

@@ -1,9 +1,12 @@
 use crate::server::{PoolConfig, StaticLease};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
 use std::time::{SystemTime, Duration};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lease {
     pub ip: Ipv4Addr,
     pub mac: Vec<u8>,
@@ -17,28 +20,59 @@ pub struct LeaseDatabase {
     pool_end: u32,
     static_leases: HashMap<Vec<u8>, Ipv4Addr>,
     lease_duration: Duration,
+    storage_path: Option<PathBuf>,
 }
 
 impl LeaseDatabase {
-    pub fn new(pool: &PoolConfig, static_leases: &[StaticLease]) -> Self {
+    pub fn new(pool: &PoolConfig, static_leases: &[StaticLease], storage_path: Option<PathBuf>) -> Self {
         let mut sl_map = HashMap::new();
         for sl in static_leases {
-            // Simple hex string to bytes parsing (assuming AA:BB:CC...)
             if let Ok(mac_bytes) = parse_mac(&sl.mac) {
                 sl_map.insert(mac_bytes, sl.ip);
             }
         }
 
-        // Parse lease time (very basic for now)
         let lease_duration = parse_duration(&pool.lease_time).unwrap_or(Duration::from_secs(12 * 3600));
 
-        Self {
+        let mut db = Self {
             leases: HashMap::new(),
             pool_start: u32::from(pool.start),
             pool_end: u32::from(pool.end),
             static_leases: sl_map,
             lease_duration,
+            storage_path,
+        };
+
+        if let Err(e) = db.load() {
+            tracing::warn!("Failed to load leases: {}", e);
         }
+
+        db
+    }
+
+    pub fn load(&mut self) -> anyhow::Result<()> {
+        if let Some(path) = &self.storage_path {
+            if path.exists() {
+                let content = fs::read_to_string(path)?;
+                let stored_leases: Vec<Lease> = serde_json::from_str(&content)?;
+                for lease in stored_leases {
+                    // Only keep valid leases? Or keep expired ones too?
+                    // For now, load everything.
+                    self.leases.insert(lease.mac.clone(), lease);
+                }
+                tracing::info!("Loaded {} leases from storage", self.leases.len());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn save(&self) -> anyhow::Result<()> {
+        if let Some(path) = &self.storage_path {
+            let leases_vec: Vec<&Lease> = self.leases.values().collect();
+            let content = serde_json::to_string_pretty(&leases_vec)?;
+            fs::write(path, content)?;
+        }
+        Ok(())
     }
 
     pub fn get_lease(&self, mac: &[u8]) -> Option<&Lease> {
@@ -46,6 +80,16 @@ impl LeaseDatabase {
     }
 
     pub fn allocate_ip(&mut self, mac: &[u8], requested_ip: Option<Ipv4Addr>) -> Option<Lease> {
+        let lease = self.allocate_ip_internal(mac, requested_ip)?;
+        
+        if let Err(e) = self.save() {
+            tracing::error!("Failed to persist lease: {}", e);
+        }
+        
+        Some(lease)
+    }
+
+    fn allocate_ip_internal(&mut self, mac: &[u8], requested_ip: Option<Ipv4Addr>) -> Option<Lease> {
         // 1. Check static leases
         if let Some(&ip) = self.static_leases.get(mac) {
             let lease = Lease {
