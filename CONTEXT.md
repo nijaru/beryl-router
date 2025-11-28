@@ -10,9 +10,9 @@ The system consists of a userspace control daemon (`beryl-routerd`) and kernel-s
 ┌──────────────────────────────────────────────────────────────────┐
 │  beryl-routerd (Userspace)                                      │
 │  • REST API (Axum, port 8080)                                   │
-│  • Config Management (TOML/JSON)                                │
+│  • Config Management (TOML)                                     │
 │  • eBPF Loader (Aya)                                            │
-│  • Mode Manager (Router/AP/Repeater)                            │
+│  • Services: DHCP Server, DNS Server                            │
 └──────────────────────────────────────────────────────────────────┘
           │                       │
           ▼                       ▼
@@ -21,13 +21,6 @@ The system consists of a userspace control daemon (`beryl-routerd`) and kernel-s
 │ • Blocklist (IP/Port)│   │ • Egress Filtering   │
 │ • Rate Limiting      │   │ • QoS Marking        │
 └─────────────────────┘   └──────────────────────┘
-          │                       │
-          ▼                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  Linux Kernel / Hardware (MT7981)                               │
-│  • nftables (NAT/Conntrack)                                     │
-│  • MTK Flow Offload (Hardware Fast-Path)                        │
-└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
@@ -35,77 +28,73 @@ The system consists of a userspace control daemon (`beryl-routerd`) and kernel-s
 - **Language:** Rust (2024 Edition)
 - **Userspace:**
     - **Runtime:** `tokio`
-    - **API:** `axum` + `tower-http`
+    - **API:** `axum`
     - **Config:** `serde` + `toml`
-    - **Logging:** `tracing`
+    - **DHCP:** `dhcproto` + `socket2`
+    - **DNS:** `hickory-dns` (planned)
 - **Kernel (eBPF):**
     - **Loader:** `aya`
     - **Programs:** `aya-ebpf` (no_std)
-    - **Requirement:** Rust Nightly (for `-Z build-std`)
 
 ## Workspace Structure
 
 - `beryl-routerd` (root `src/`): Main control plane binary.
 - `beryl-router-ebpf`: Kernel programs (XDP/TC).
-- `crates/beryl-common`: Shared types (config, stats) between kernel/user.
-- `crates/beryl-config`: Configuration parsing logic.
+- `crates/beryl-common`: Shared types (config, stats).
+- `crates/beryl-config`: Configuration parsing logic (TOML).
+- `crates/beryl-dhcp`: DHCP server/client implementation.
+- `crates/beryl-dns`: DNS resolver implementation.
 - `crates/beryl-ebpf`: Logic to load/attach eBPF programs.
 - `crates/beryl-nft`: `nftables` integration (NAT).
 
-## Current Status (Phase 1 Complete)
+## Current Status (Phase 2 In Progress)
 
 - **Implemented:**
     - Multi-crate workspace structure.
     - XDP Ingress firewall (Blocklist IPs/Ports).
     - TC Egress firewall (Blocklist IPs).
     - REST API (`/status`, `/stats`, `/config`).
-    - `xtask` build system for cross-compilation.
+    - **DHCP Server:**
+        - Packet parsing with `dhcproto`.
+        - Lease management (dynamic + static).
+        - Lease persistence (JSON file).
+    - **Config:** TOML based configuration system.
+    - **Build System:**
+        - Linux: `cargo xtask build-ebpf` works.
+        - macOS (Apple Silicon): Docker/OrbStack environment (`docker-compose.yml`).
 
 - **Pending (Phase 2):**
-    - DHCP Server/Client implementation.
-    - DNS Resolver implementation.
+    - DNS Resolver implementation (`beryl-dns`).
+    - Integrate DHCP hostnames into DNS.
 
-## Handover Context (macOS → Linux)
+## Handover Context (Linux → macOS/Linux)
 
 **Last Session Date:** 2025-11-28
-**Last Machine:** macOS (nick@apple)
-**Next Machine:** Linux (nick@fedora)
+**Last Machine:** Linux (nick@fedora)
+**Next Step:** Continue DNS implementation.
 
-### Immediate Actions Required
+### Development Workflow
 
-1.  **Sync Code:**
-    ```bash
-    git pull
-    ```
-2.  **Verify Build (Linux):**
-    The eBPF build was skipped on macOS due to missing kernel headers. You must verify it compiles on Linux.
-    ```bash
-    cargo xtask build-ebpf
-    cargo check --workspace
-    ```
-3.  **Resume Work:**
-    We are starting **Phase 2: DHCP Server/Client**.
-    - Task ID: `beryl-router-j82` (in beads)
-    - Goal: Implement `dhcproto` based server/client in `crates/beryl-dhcp`.
-    - Reference: `ai/design/SYSTEM.md` (Service #2 and #3).
+**Option A: Linux (Native)**
+```bash
+cargo xtask build-ebpf
+cargo build --workspace
+```
+
+**Option B: macOS (Docker/OrbStack)**
+1.  Start container: `docker compose up -d`
+2.  Enter shell: `docker compose exec dev bash`
+3.  Build: `cargo xtask build --release --target aarch64-unknown-linux-musl`
 
 ### Active Task State
-- **Restructure:** Complete & Merged.
-- **TC-BPF:** Complete & Merged.
-- **API:** Complete & Merged.
-- **Next Task:** `beryl-router-j82` (Phase 2 DHCP) is currently **OPEN**.
-
-## Development Constraints
-
-1.  **eBPF Build:** Requires **Linux** (for `aya` linking) and **Rust Nightly**.
-    - Command: `cargo xtask build-ebpf`
-2.  **Userspace Build:** Can use **Rust Stable**.
-    - Command: `cargo build --package beryl-routerd`
-3.  **Cross-Compilation:** Target `aarch64-unknown-linux-musl` for the device.
+- **Phase 1 (Core):** Complete.
+- **Phase 2 (DHCP):** Server logic & persistence complete.
+- **Phase 2 (DNS):** Skeleton created.
+- **Next Task:** Implement DNS server logic in `crates/beryl-dns` using `hickory-server`.
 
 ## Key Documentation
 
 - `AGENTS.md`: Tool usage and operational guidelines.
 - `ai/STATUS.md`: Current task status and blockers.
 - `ai/design/SYSTEM.md`: Detailed system architecture.
-- `ai/design/API.md`: REST API specification.
+- `ai/design/CONFIG.md`: TOML config schema.

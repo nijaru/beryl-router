@@ -38,6 +38,7 @@ Permanent quirks and gotchas for this project.
 | aya on macOS | Doesn't compile - needs Linux headers | Build on Fedora or Docker | Testing |
 | Cross-compile | aarch64-unknown-linux-musl target | Need linker: aarch64-linux-gnu-gcc or zig | Rust docs |
 | bpf-linker | Required for eBPF compilation | cargo install bpf-linker (Linux only) | aya docs |
+| Docker (Mac) | Use `rust-slim-bookworm` based image on Apple Silicon | Allows native aarch64 builds without cross-compiling | User |
 
 ## User Context
 

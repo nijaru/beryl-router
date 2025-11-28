@@ -74,7 +74,7 @@
 - [x] Add crates/beryl-dhcp
 - [x] Use dhcproto for packet parsing
 - [x] IP pool management
-- [ ] Lease storage (persist to file)
+- [x] Lease storage (persist to file)
 - [x] Static lease support
 - [ ] Integrate with DNS (hostname → IP)
 
