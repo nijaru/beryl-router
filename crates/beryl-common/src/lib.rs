@@ -40,6 +40,9 @@ pub struct FirewallConfig {
     /// Blocked destination ports
     #[serde(default)]
     pub blocked_ports: Vec<u16>,
+    /// Blocked egress IP addresses (LAN -> WAN)
+    #[serde(default)]
+    pub blocked_egress_ips: Vec<String>,
 }
 
 #[cfg(not(feature = "ebpf"))]
@@ -48,6 +51,7 @@ impl Default for FirewallConfig {
         Self {
             blocked_ips: Vec::new(),
             blocked_ports: Vec::new(),
+            blocked_egress_ips: Vec::new(),
         }
     }
 }

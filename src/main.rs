@@ -4,14 +4,9 @@
 //! via configuration file watching.
 
 use anyhow::{Context, Result};
-use aya::{
-    include_bytes_aligned,
-    maps::{HashMap, PerCpuArray},
-    programs::{Xdp, XdpFlags},
-    Ebpf,
-};
-use aya_log::EbpfLogger;
+use aya::maps::{HashMap, PerCpuArray};
 use beryl_common::{FirewallConfig, PacketAction, Stats};
+use beryl_ebpf::BerylEbpf;
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
 use std::{
@@ -25,13 +20,13 @@ use tokio::{
     sync::{mpsc, RwLock},
     time::interval,
 };
-use tracing::{debug, error, info, warn, Level};
+use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Debug, Parser)]
-#[command(name = "beryl-router", about = "XDP/eBPF Firewall for Beryl AX")]
+#[command(name = "beryl-routerd", about = "XDP/eBPF Firewall for Beryl AX")]
 struct Args {
-    /// Network interface to attach XDP program to
+    /// Network interface to attach XDP program to (LAN/WAN ingress)
     #[arg(short, long, default_value = "eth0")]
     interface: String,
 
@@ -49,50 +44,23 @@ struct Args {
 }
 
 struct Router {
-    ebpf: Ebpf,
+    ebpf: BerylEbpf,
     config_path: PathBuf,
 }
 
 impl Router {
     fn new(args: &Args) -> Result<Self> {
-        // Load eBPF bytecode compiled from beryl-router-ebpf
-        #[cfg(debug_assertions)]
-        let mut ebpf = Ebpf::load(include_bytes_aligned!(
-            "../../target/bpfel-unknown-none/debug/beryl-router-ebpf"
-        ))?;
+        let mut ebpf = BerylEbpf::load()?;
 
-        #[cfg(not(debug_assertions))]
-        let mut ebpf = Ebpf::load(include_bytes_aligned!(
-            "../../target/bpfel-unknown-none/release/beryl-router-ebpf"
-        ))?;
-
-        // Initialize eBPF logging
-        if let Err(e) = EbpfLogger::init(&mut ebpf) {
-            warn!("Failed to initialize eBPF logger: {}", e);
+        // Attach XDP (Ingress)
+        ebpf.attach_xdp(&args.interface, args.skb_mode)?;
+        
+        // Attach TC (Egress) - usually same interface for single-NIC testing, 
+        // or eth0 (WAN) for router mode. For now, attach to same interface.
+        if let Err(e) = ebpf.attach_tc_egress(&args.interface) {
+            error!("Failed to attach TC egress: {}", e);
+            // Don't fail hard, maybe kernel doesn't support it or qdisc issue
         }
-
-        // Load and attach XDP program
-        let program: &mut Xdp = ebpf
-            .program_mut("xdp_firewall")
-            .context("XDP program not found")?
-            .try_into()?;
-        program.load()?;
-
-        let flags = if args.skb_mode {
-            XdpFlags::SKB_MODE
-        } else {
-            XdpFlags::default()
-        };
-
-        program
-            .attach(&args.interface, flags)
-            .context("Failed to attach XDP program")?;
-
-        info!(
-            interface = %args.interface,
-            mode = if args.skb_mode { "SKB" } else { "Native" },
-            "XDP program attached"
-        );
 
         Ok(Self {
             ebpf,
@@ -114,47 +82,63 @@ impl Router {
     }
 
     fn apply_config(&mut self, config: &FirewallConfig) -> Result<()> {
-        // Update IP blocklist
-        let mut blocklist: HashMap<_, u32, u32> =
-            HashMap::try_from(self.ebpf.map_mut("BLOCKLIST").context("BLOCKLIST map not found")?)?;
+        // Update IP blocklist (XDP Ingress)
+        if let Some(map) = self.ebpf.get_map_mut("BLOCKLIST") {
+             let mut blocklist: HashMap<_, u32, u32> = HashMap::try_from(map)?;
 
-        // Clear existing entries by iterating and removing
-        let keys: Vec<u32> = blocklist.keys().filter_map(|k| k.ok()).collect();
-        for key in keys {
-            let _ = blocklist.remove(&key);
-        }
+            // Clear existing entries
+            let keys: Vec<u32> = blocklist.keys().filter_map(|k| k.ok()).collect();
+            for key in keys {
+                let _ = blocklist.remove(&key);
+            }
 
-        // Add new blocked IPs
-        for ip_str in &config.blocked_ips {
-            if let Ok(ip) = ip_str.parse::<Ipv4Addr>() {
-                let ip_u32 = u32::from(ip);
-                blocklist.insert(ip_u32, PacketAction::Drop as u32, 0)?;
-                debug!(ip = %ip_str, "Added IP to blocklist");
-            } else {
-                warn!(ip = %ip_str, "Invalid IP address in config");
+            // Add new blocked IPs
+            for ip_str in &config.blocked_ips {
+                if let Ok(ip) = ip_str.parse::<Ipv4Addr>() {
+                    let ip_u32 = u32::from(ip);
+                    blocklist.insert(ip_u32, PacketAction::Drop as u32, 0)?;
+                    debug!(ip = %ip_str, "Added IP to ingress blocklist");
+                }
             }
         }
 
-        // Update port blocklist
-        let mut port_blocklist: HashMap<_, u16, u32> = HashMap::try_from(
-            self.ebpf
-                .map_mut("PORT_BLOCKLIST")
-                .context("PORT_BLOCKLIST map not found")?,
-        )?;
+        // Update Port blocklist (XDP Ingress)
+        if let Some(map) = self.ebpf.get_map_mut("PORT_BLOCKLIST") {
+            let mut port_blocklist: HashMap<_, u16, u32> = HashMap::try_from(map)?;
 
-        let port_keys: Vec<u16> = port_blocklist.keys().filter_map(|k| k.ok()).collect();
-        for key in port_keys {
-            let _ = port_blocklist.remove(&key);
+            let port_keys: Vec<u16> = port_blocklist.keys().filter_map(|k| k.ok()).collect();
+            for key in port_keys {
+                let _ = port_blocklist.remove(&key);
+            }
+
+            for port in &config.blocked_ports {
+                port_blocklist.insert(*port, PacketAction::Drop as u32, 0)?;
+                debug!(port, "Added port to ingress blocklist");
+            }
         }
-
-        for port in &config.blocked_ports {
-            port_blocklist.insert(*port, PacketAction::Drop as u32, 0)?;
-            debug!(port, "Added port to blocklist");
+        
+        // Update Egress blocklist (TC Egress)
+        if let Some(map) = self.ebpf.get_map_mut("EGRESS_BLOCK") {
+            let mut egress_block: HashMap<_, u32, u32> = HashMap::try_from(map)?;
+            
+            let keys: Vec<u32> = egress_block.keys().filter_map(|k| k.ok()).collect();
+            for key in keys {
+                let _ = egress_block.remove(&key);
+            }
+            
+             for ip_str in &config.blocked_egress_ips {
+                if let Ok(ip) = ip_str.parse::<Ipv4Addr>() {
+                    let ip_u32 = u32::from(ip);
+                    egress_block.insert(ip_u32, PacketAction::Drop as u32, 0)?;
+                    debug!(ip = %ip_str, "Added IP to egress blocklist");
+                }
+            }
         }
 
         info!(
-            blocked_ips = config.blocked_ips.len(),
-            blocked_ports = config.blocked_ports.len(),
+            ingress_ips = config.blocked_ips.len(),
+            ingress_ports = config.blocked_ports.len(),
+            egress_ips = config.blocked_egress_ips.len(),
             "Configuration applied"
         );
 
@@ -162,8 +146,8 @@ impl Router {
     }
 
     fn get_stats(&self) -> Result<Stats> {
-        let stats: PerCpuArray<_, Stats> =
-            PerCpuArray::try_from(self.ebpf.map("STATS").context("STATS map not found")?)?;
+        let map = self.ebpf.get_map("STATS").context("STATS map not found")?;
+        let stats: PerCpuArray<_, Stats> = PerCpuArray::try_from(map)?;
 
         let per_cpu_stats = stats.get(&0, 0)?;
         let mut total = Stats::default();

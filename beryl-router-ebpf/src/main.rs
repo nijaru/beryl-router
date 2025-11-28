@@ -9,7 +9,7 @@ use aya_ebpf::{
 };
 use aya_log_ebpf::info;
 use beryl_common::{PacketAction, Stats};
-use core::mem;
+mod tc_egress;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv4Hdr},

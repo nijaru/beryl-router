@@ -10,7 +10,7 @@
 | Config schema | Complete | ai/design/CONFIG.md |
 | nftables design | Complete | ai/design/NFTABLES.md |
 | Flashing guide | Complete | ai/design/FLASHING.md |
-| Project scaffold | In Progress | Restructuring per CRATES.md |
+| Project scaffold | Complete | Multi-crate structure implemented |
 | XDP firewall | Code complete | Needs build verification |
 | TC-BPF egress | Not started | Phase 1.5 |
 | REST API | Not started | Phase 1.7 |
@@ -29,6 +29,7 @@
 
 ## Recent Commits
 
+- refactor: Restructure workspace per ai/design/CRATES.md
 - chore: Initialize beads task tracking
 - System design document for full router stack
 - Initial project scaffold with XDP/eBPF architecture
@@ -49,4 +50,4 @@
 - U-Boot recovery (hold reset 10s) is safety net for bricking
 
 ## Active Work
-Restructuring workspace to multi-crate architecture (CRATES.md).
+TC-BPF egress filtering (Phase 1.5).
