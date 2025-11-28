@@ -1,0 +1,15 @@
+[package]
+name = "beryl-dhcp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+beryl-common = { path = "../beryl-common" }
+dhcproto = "0.12"
+socket2 = "0.5"
+libc = "0.2"
+ipnet = "2.9"
+serde = { workspace = true, features = ["derive"] }

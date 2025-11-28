@@ -8,8 +8,9 @@ name = "beryl-routerd"
 path = "src/main.rs"
 
 [dependencies]
-beryl-common = { path = "crates/beryl-common" }
+beryl-common = { path = "crates/beryl-common", features = ["user"] }
 beryl-config = { path = "crates/beryl-config" }
+beryl-dhcp = { path = "crates/beryl-dhcp" }
 beryl-ebpf = { path = "crates/beryl-ebpf" }
 beryl-nft = { path = "crates/beryl-nft" }
 aya.workspace = true
@@ -23,6 +24,7 @@ notify.workspace = true
 serde_json.workspace = true
 axum.workspace = true
 tower-http.workspace = true
+serde.workspace = true
 
 [workspace]
 resolver = "2"
@@ -30,6 +32,7 @@ members = [
     ".",
     "crates/beryl-common",
     "crates/beryl-config",
+    "crates/beryl-dhcp",
     "crates/beryl-ebpf",
     "crates/beryl-nft",
     "xtask",

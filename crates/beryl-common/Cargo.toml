@@ -3,12 +3,14 @@ name = "beryl-common"
 version.workspace = true
 edition.workspace = true
 
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+aya = { version = "0.13", optional = true }
+
 [features]
 default = []
 ebpf = []
+user = ["serde", "aya"]
 
-[dependencies]
-serde = { version = "1", features = ["derive"], optional = true }
-
-[target.'cfg(not(target_arch = "bpf"))'.dependencies]
-serde = { version = "1", features = ["derive"] }
+# [target.'cfg(not(target_arch = "bpf"))'.dependencies]
+# serde = { version = "1", features = ["derive"] }

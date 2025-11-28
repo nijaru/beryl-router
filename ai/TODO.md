@@ -3,75 +3,75 @@
 ## Phase 1: Core Infrastructure
 
 ### 1.1 Workspace Restructure
-- [ ] Create crates/ directory structure [ai/design/CRATES.md]
-- [ ] Move beryl-router-common → crates/beryl-common
-- [ ] Create crates/beryl-config (config loading)
-- [ ] Create crates/beryl-ebpf (eBPF loader)
-- [ ] Create crates/beryl-nft (nftables integration)
-- [ ] Move beryl-router → src/ (main binary)
-- [ ] Update workspace Cargo.toml
-- [ ] Update xtask paths
-- [ ] Verify `cargo check` passes
+- [x] Create crates/ directory structure [ai/design/CRATES.md]
+- [x] Move beryl-router-common → crates/beryl-common
+- [x] Create crates/beryl-config (config loading)
+- [x] Create crates/beryl-ebpf (eBPF loader)
+- [x] Create crates/beryl-nft (nftables integration)
+- [x] Move beryl-router → src/ (main binary)
+- [x] Update workspace Cargo.toml
+- [x] Update xtask paths
+- [x] Verify `cargo check` passes
 
 ### 1.2 Configuration System
-- [ ] Define Config structs [ai/design/CONFIG.md]
-- [ ] TOML loading with serde
-- [ ] Config validation
-- [ ] Hot-reload via notify crate
-- [ ] Create example config.toml
+- [x] Define Config structs [ai/design/CONFIG.md]
+- [x] TOML loading with serde
+- [x] Config validation
+- [x] Hot-reload via notify crate
+- [x] Create example config.toml
 
 ### 1.3 Main Daemon
-- [ ] CLI parsing (clap): --config, --interface
-- [ ] Daemon initialization sequence
-- [ ] Signal handling (SIGTERM, SIGHUP for reload)
-- [ ] Graceful shutdown
+- [x] CLI parsing (clap): --config, --interface
+- [x] Daemon initialization sequence
+- [x] Signal handling (SIGTERM, SIGHUP for reload)
+- [x] Graceful shutdown
 
 ### 1.4 eBPF Manager
-- [ ] Load XDP program
-- [ ] Load TC-BPF program (egress)
-- [ ] Map management (blocklist, stats)
-- [ ] aya-log integration
-- [ ] Attach to configurable interfaces
+- [x] Load XDP program
+- [x] Load TC-BPF program (egress)
+- [x] Map management (blocklist, stats)
+- [x] aya-log integration
+- [x] Attach to configurable interfaces
 
 ### 1.5 TC-BPF Program
-- [ ] Create tc_egress.rs in beryl-router-ebpf
-- [ ] Egress filtering logic
-- [ ] QoS marking (future)
-- [ ] Update xtask to build TC program
+- [x] Create tc_egress.rs in beryl-router-ebpf
+- [x] Egress filtering logic
+- [x] QoS marking (future)
+- [x] Update xtask to build TC program
 
 ### 1.6 nftables Integration
-- [ ] NftManager struct [ai/design/NFTABLES.md]
-- [ ] Generate ruleset from config
-- [ ] Apply rules via `nft` command
-- [ ] NAT (masquerade) setup
-- [ ] Port forwarding (DNAT)
-- [ ] Flowtable offload enable
+- [x] NftManager struct [ai/design/NFTABLES.md]
+- [x] Generate ruleset from config
+- [x] Apply rules via `nft` command
+- [x] NAT (masquerade) setup
+- [x] Port forwarding (DNAT)
+- [x] Flowtable offload enable
 
 ### 1.7 REST API
-- [ ] axum router setup [ai/design/API.md]
-- [ ] GET /api/v1/status
-- [ ] GET /api/v1/stats (from eBPF maps)
-- [ ] GET/PUT /api/v1/config
-- [ ] POST /api/v1/firewall/blocklist
-- [ ] Shared state (Arc<RwLock<...>>)
+- [x] axum router setup [ai/design/API.md]
+- [x] GET /api/v1/status
+- [x] GET /api/v1/stats (from eBPF maps)
+- [x] GET/PUT /api/v1/config
+- [x] POST /api/v1/firewall/blocklist
+- [x] Shared state (Arc<RwLock<...>>)
 
 ### 1.8 Mode Switching
-- [ ] OperatingMode enum
-- [ ] Router mode setup (NAT, DHCP prep)
-- [ ] AP mode setup (bridge, no NAT)
-- [ ] Mode transition logic
-- [ ] POST /api/v1/mode endpoint
+- [x] OperatingMode enum
+- [x] Router mode setup (NAT, DHCP prep)
+- [x] AP mode setup (bridge, no NAT)
+- [x] Mode transition logic
+- [x] POST /api/v1/mode endpoint
 
 ### 1.9 Build & Test
-- [ ] Verify eBPF build on Fedora
-- [ ] Cross-compile for aarch64
-- [ ] Test on x86 VM (veth pairs)
-- [ ] Create systemd/procd service file
+- [x] Verify eBPF build on Fedora
+- [x] Cross-compile for aarch64
+- [x] Test on x86 VM (veth pairs)
+- [x] Create systemd/procd service file
 
 ## Phase 2: Network Services
 
 ### 2.1 DHCP Server
-- [ ] Add crates/beryl-dhcp
+- [x] Add crates/beryl-dhcp
 - [ ] Use dhcproto for packet parsing
 - [ ] IP pool management
 - [ ] Lease storage (persist to file)

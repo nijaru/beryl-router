@@ -6,6 +6,8 @@
 use anyhow::{Context, Result};
 use aya::maps::{HashMap, PerCpuArray};
 use beryl_common::{FirewallConfig, PacketAction, Stats};
+use beryl_config::Config;
+use beryl_dhcp::{Server as DhcpServer, ServerConfig as DhcpServerConfig};
 use beryl_ebpf::BerylEbpf;
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -18,6 +20,7 @@ use std::{
 use tokio::{
     fs,
     sync::{mpsc, RwLock},
+    task::JoinHandle,
     time::interval,
 };
 use tracing::{debug, error, info, Level};
@@ -33,7 +36,7 @@ struct Args {
     interface: String,
 
     /// Configuration file path
-    #[arg(short, long, default_value = "/etc/beryl-router/config.json")]
+    #[arg(short, long, default_value = "/etc/beryl/config.toml")]
     config: PathBuf,
 
     /// Use SKB mode instead of native XDP (for testing/compatibility)
@@ -52,6 +55,8 @@ struct Args {
 pub struct Router {
     ebpf: BerylEbpf,
     config_path: PathBuf,
+    dhcp_handle: Option<JoinHandle<()>>,
+    current_config: Option<Config>,
 }
 
 impl Router {
@@ -61,33 +66,39 @@ impl Router {
         // Attach XDP (Ingress)
         ebpf.attach_xdp(&args.interface, args.skb_mode)?;
         
-        // Attach TC (Egress) - usually same interface for single-NIC testing, 
-        // or eth0 (WAN) for router mode. For now, attach to same interface.
+        // Attach TC (Egress)
         if let Err(e) = ebpf.attach_tc_egress(&args.interface) {
             error!("Failed to attach TC egress: {}", e);
-            // Don't fail hard, maybe kernel doesn't support it or qdisc issue
         }
 
         Ok(Self {
             ebpf,
             config_path: args.config.clone(),
+            dhcp_handle: None,
+            current_config: None,
         })
     }
 
     pub async fn load_config(&mut self) -> Result<()> {
-        let config: FirewallConfig = if self.config_path.exists() {
-            let contents = fs::read_to_string(&self.config_path).await?;
-            serde_json::from_str(&contents)?
+        let config = if self.config_path.exists() {
+            beryl_config::load_config(&self.config_path)?
         } else {
             info!("Config file not found, using defaults");
-            FirewallConfig::default()
+            return Ok(());
         };
 
-        self.apply_config(&config)?;
+        self.apply_firewall_config(&config.firewall)?;
+        self.apply_dhcp_config(&config.dhcp).await?;
+        
+        self.current_config = Some(config);
         Ok(())
     }
 
-    pub fn apply_config(&mut self, config: &FirewallConfig) -> Result<()> {
+    pub fn get_current_config(&self) -> Option<Config> {
+        self.current_config.clone()
+    }
+
+    pub fn apply_firewall_config(&mut self, config: &FirewallConfig) -> Result<()> {
         // Update IP blocklist (XDP Ingress)
         if let Some(map) = self.ebpf.get_map_mut("BLOCKLIST") {
              let mut blocklist: HashMap<_, u32, u32> = HashMap::try_from(map)?;
@@ -145,8 +156,31 @@ impl Router {
             ingress_ips = config.blocked_ips.len(),
             ingress_ports = config.blocked_ports.len(),
             egress_ips = config.blocked_egress_ips.len(),
-            "Configuration applied"
+            "Firewall configuration applied"
         );
+
+        Ok(())
+    }
+
+    pub async fn apply_dhcp_config(&mut self, config: &beryl_config::DhcpConfig) -> Result<()> {
+        // Stop existing DHCP server if running
+        if let Some(handle) = self.dhcp_handle.take() {
+            handle.abort(); // Simple cancellation
+            info!("Stopped existing DHCP server");
+        }
+
+        if let Some(server_config) = &config.server {
+            if server_config.enabled {
+                info!("Starting DHCP server on {}", server_config.interface);
+                let mut server = DhcpServer::new(server_config.clone());
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = server.run().await {
+                        error!("DHCP Server failed: {}", e);
+                    }
+                });
+                self.dhcp_handle = Some(handle);
+            }
+        }
 
         Ok(())
     }

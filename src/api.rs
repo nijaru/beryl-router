@@ -1,10 +1,10 @@
 use axum::{
     extract::{State},
-    routing::{get, post},
+    routing::{get},
     Json, Router,
 };
-use beryl_common::{FirewallConfig, Stats};
-use serde::{Deserialize, Serialize};
+use beryl_common::{Stats};
+use beryl_config::Config;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
@@ -17,21 +17,21 @@ pub struct AppState {
     pub router: Arc<RwLock<AppRouter>>,
 }
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 pub struct StatusResponse {
     pub version: &'static str,
     pub mode: &'static str, // Placeholder for Phase 3
     pub services: ServicesStatus,
 }
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 pub struct ServicesStatus {
     pub dhcp_server: &'static str,
     pub dns_server: &'static str,
     pub wifi: &'static str,
 }
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 pub struct StatsResponse {
     pub packets: Stats,
 }
@@ -50,7 +50,7 @@ async fn status_handler() -> Json<StatusResponse> {
         version: env!("CARGO_PKG_VERSION"),
         mode: "router", // Hardcoded for Phase 1
         services: ServicesStatus {
-            dhcp_server: "stopped", // Phase 2
+            dhcp_server: "stopped", // Phase 2 (implemented but no status check yet)
             dns_server: "stopped",  // Phase 2
             wifi: "stopped",        // Phase 3
         },
@@ -63,25 +63,26 @@ async fn stats_handler(State(state): State<AppState>) -> Json<StatsResponse> {
     Json(StatsResponse { packets: stats })
 }
 
-async fn get_config(State(state): State<AppState>) -> Json<FirewallConfig> {
+async fn get_config(State(state): State<AppState>) -> Json<Option<Config>> {
     let router = state.router.read().await;
-    // In a real app, we'd probably cache the config in AppRouter or read it from the file
-    // For now, return default or empty since we don't store the config in memory in AppRouter yet
-    // We should probably add config storage to AppRouter.
-    // ...Refactor needed in Router struct...
-    Json(FirewallConfig::default()) 
+    Json(router.get_current_config())
 }
 
 async fn put_config(
     State(state): State<AppState>,
-    Json(config): Json<FirewallConfig>,
-) -> Json<FirewallConfig> {
+    Json(config): Json<Config>,
+) -> Json<Config> {
     let mut router = state.router.write().await;
-    if let Err(e) = router.apply_config(&config) {
-        tracing::error!("Failed to apply config via API: {}", e);
-        // In production, return 500 or 400
+    
+    if let Err(e) = router.apply_firewall_config(&config.firewall) {
+        tracing::error!("Failed to apply firewall config: {}", e);
     }
-    // In a real app, we would write this back to the config file
-    // For Phase 1, just applying it to eBPF maps is enough to demonstrate
+    if let Err(e) = router.apply_dhcp_config(&config.dhcp).await {
+        tracing::error!("Failed to apply DHCP config: {}", e);
+    }
+    
+    // Note: We are not persisting the config to file here yet.
+    // It will be lost on restart.
+    
     Json(config)
 }

@@ -13,4 +13,4 @@ xtask = "run --package xtask --"
 
 # For local development/testing
 [target.x86_64-unknown-linux-gnu]
-runner = "sudo -E"
+# runner = "sudo -E"

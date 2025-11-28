@@ -10,6 +10,7 @@ use aya_ebpf::{
 use aya_log_ebpf::info;
 use beryl_common::{PacketAction, Stats};
 mod tc_egress;
+use core::mem;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv4Hdr},
@@ -52,7 +53,7 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
 
 fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
     // Update packet counter
-    if let Some(stats) = unsafe { STATS.get_ptr_mut(0) } {
+    if let Some(stats) = STATS.get_ptr_mut(0) {
         unsafe { (*stats).packets_total += 1 };
     }
 
@@ -73,7 +74,7 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
     // Check IP blocklist
     if let Some(&action) = unsafe { BLOCKLIST.get(&src_ip) } {
         if action == PacketAction::Drop as u32 {
-            if let Some(stats) = unsafe { STATS.get_ptr_mut(0) } {
+            if let Some(stats) = STATS.get_ptr_mut(0) {
                 unsafe { (*stats).packets_dropped += 1 };
             }
             info!(&ctx, "DROP: blocked IP {:i}", src_ip);
@@ -100,7 +101,7 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
     if dst_port != 0 {
         if let Some(&action) = unsafe { PORT_BLOCKLIST.get(&dst_port) } {
             if action == PacketAction::Drop as u32 {
-                if let Some(stats) = unsafe { STATS.get_ptr_mut(0) } {
+                if let Some(stats) = STATS.get_ptr_mut(0) {
                     unsafe { (*stats).packets_dropped += 1 };
                 }
                 info!(&ctx, "DROP: blocked port {}", dst_port);
@@ -110,7 +111,7 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
     }
 
     // Update passed counter
-    if let Some(stats) = unsafe { STATS.get_ptr_mut(0) } {
+    if let Some(stats) = STATS.get_ptr_mut(0) {
         unsafe { (*stats).packets_passed += 1 };
     }
 

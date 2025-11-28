@@ -16,12 +16,12 @@ impl BerylEbpf {
         // Load eBPF bytecode
         #[cfg(debug_assertions)]
         let mut ebpf = Ebpf::load(include_bytes_aligned!(
-            "../../../target/bpfel-unknown-none/debug/beryl-router-ebpf"
+            "../../../beryl-router-ebpf/target/bpfel-unknown-none/debug/beryl-router-ebpf"
         ))?;
 
         #[cfg(not(debug_assertions))]
         let mut ebpf = Ebpf::load(include_bytes_aligned!(
-            "../../../target/bpfel-unknown-none/release/beryl-router-ebpf"
+            "../../../beryl-router-ebpf/target/bpfel-unknown-none/release/beryl-router-ebpf"
         ))?;
 
         // Initialize eBPF logging

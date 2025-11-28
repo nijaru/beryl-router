@@ -24,14 +24,18 @@ impl From<u32> for PacketAction {
 /// Per-CPU statistics.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Stats {
     pub packets_total: u64,
     pub packets_passed: u64,
     pub packets_dropped: u64,
 }
 
+#[cfg(feature = "aya")]
+unsafe impl aya::Pod for Stats {}
+
 /// Configuration for a firewall rule.
-#[cfg(not(feature = "ebpf"))]
+#[cfg(feature = "serde")]
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct FirewallConfig {
     /// Blocked IP addresses (IPv4 as dotted-decimal strings)
@@ -45,7 +49,7 @@ pub struct FirewallConfig {
     pub blocked_egress_ips: Vec<String>,
 }
 
-#[cfg(not(feature = "ebpf"))]
+#[cfg(feature = "serde")]
 impl Default for FirewallConfig {
     fn default() -> Self {
         Self {
