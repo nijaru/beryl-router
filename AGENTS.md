@@ -80,6 +80,7 @@ scp target/aarch64-unknown-linux-musl/release/beryl-routerd root@192.168.8.1:/tm
 | eBPF | no_std, aya-ebpf macros |
 | Config format | TOML files, JSON API |
 | Naming | snake_case, descriptive |
+| Linting | Fix all `clippy::pedantic` issues |
 
 ## Architecture Summary
 

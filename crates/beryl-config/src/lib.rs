@@ -1,7 +1,6 @@
 use beryl_common::FirewallConfig;
 use beryl_dhcp::ServerConfig as DhcpServerConfig;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
 use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use aya::maps::{HashMap, PerCpuArray};
 use beryl_common::{FirewallConfig, PacketAction, Stats};
 use beryl_config::Config;
-use beryl_dhcp::{Server as DhcpServer, ServerConfig as DhcpServerConfig};
+use beryl_dhcp::Server as DhcpServer;
 use beryl_ebpf::BerylEbpf;
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -18,7 +18,6 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    fs,
     sync::{mpsc, RwLock},
     task::JoinHandle,
     time::interval,
@@ -30,26 +29,26 @@ mod api;
 
 #[derive(Debug, Parser)]
 #[command(name = "beryl-routerd", about = "XDP/eBPF Firewall for Beryl AX")]
-struct Args {
+pub struct Args {
     /// Network interface to attach XDP program to (LAN/WAN ingress)
     #[arg(short, long, default_value = "eth0")]
-    interface: String,
+    pub interface: String,
 
     /// Configuration file path
     #[arg(short, long, default_value = "/etc/beryl/config.toml")]
-    config: PathBuf,
+    pub config: PathBuf,
 
     /// Use SKB mode instead of native XDP (for testing/compatibility)
     #[arg(long)]
-    skb_mode: bool,
+    pub skb_mode: bool,
 
     /// Statistics reporting interval in seconds
     #[arg(long, default_value = "10")]
-    stats_interval: u64,
+    pub stats_interval: u64,
 
     /// API server bind address
     #[arg(long, default_value = "0.0.0.0:8080")]
-    api_bind: String,
+    pub api_bind: String,
 }
 
 pub struct Router {
