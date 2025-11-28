@@ -11,9 +11,9 @@
 | nftables design | Complete | ai/design/NFTABLES.md |
 | Flashing guide | Complete | ai/design/FLASHING.md |
 | Project scaffold | Complete | Multi-crate structure implemented |
-| XDP firewall | Code complete | Needs build verification |
-| TC-BPF egress | Not started | Phase 1.5 |
-| REST API | Not started | Phase 1.7 |
+| XDP firewall | Code complete | Ingress filtering (Blocklist/Ports) |
+| TC-BPF egress | Code complete | Egress filtering (Phase 1.5) |
+| REST API | Code complete | Status, Stats, Config endpoints (Phase 1.7) |
 | DHCP server/client | Not started | Phase 2 |
 | DNS server | Not started | Phase 2 |
 | WiFi manager | Not started | Phase 3 |
@@ -29,10 +29,10 @@
 
 ## Recent Commits
 
+- feat: Implement REST API (Phase 1.7)
+- feat: Implement TC-BPF egress filtering
 - refactor: Restructure workspace per ai/design/CRATES.md
 - chore: Initialize beads task tracking
-- System design document for full router stack
-- Initial project scaffold with XDP/eBPF architecture
 
 ## User Context
 
@@ -48,6 +48,7 @@
 - Use nftables for NAT/conntrack, XDP for fast-path filtering
 - WiFi requires hostapd + proprietary MT7976 drivers (OpenWrt only)
 - U-Boot recovery (hold reset 10s) is safety net for bricking
+- Nightly Rust is required for `beryl-router-ebpf` (build-std), but userspace can be stable.
 
 ## Active Work
-TC-BPF egress filtering (Phase 1.5).
+Phase 1 complete. Ready to start Phase 2 (DHCP/DNS).
