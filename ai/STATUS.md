@@ -43,12 +43,15 @@
 | Blocker | Impact | Resolution |
 |---------|--------|------------|
 | Testing Hardware | Cannot verify eBPF | Flash custom image to router |
+| Cross-compilation env | Cannot build for Router | Install `aarch64-linux-gnu-gcc` or fix Podman |
 
 ## Recent Commits
 
+- fix: Resolve merge conflicts in ai/TODO.md
+- fix: Syntax error in actuator.rs and type mismatch in main.rs
+- build: Verified native (x86_64) build passes
 - build: Compiled OpenWrt 23.05 image with CONFIG_DEBUG_INFO_BTF=y
 - feat: Integrated DHCP Client with system actuator
-- infra: Setup Docker/Podman build environment
 
 ## Artifacts
 
@@ -58,7 +61,7 @@
     2. **U-Boot:** Hold Reset 10s on boot -> `http://192.168.1.1` (PC IP: 192.168.1.2).
 
 ## Active Work
-Next: Cross-compile `beryl-routerd` and deploy.
+Next: Fix cross-compilation environment (install linker) or use Docker/Podman once permissions are fixed.
 
 ## User Context
 
@@ -78,6 +81,9 @@ Next: Cross-compile `beryl-routerd` and deploy.
 - `bpf-linker` requires specific rustc version matching the linker; updated Dockerfile to use nightly default.
 - Docker on Apple Silicon with `rust:nightly` is effective for building aarch64 binaries.
 - OpenWrt WiFi control is best done via generating `/etc/config/wireless` and calling `/sbin/wifi reload` rather than fighting netifd.
+- Cross-compiling for `aarch64-unknown-linux-musl` on Linux requires `aarch64-linux-gnu-gcc` or a properly configured `clang` + `lld` setup with sysroot.
+- Podman/Docker permissions on the current environment prevent containerized builds.
 
 ## Active Work
-Next Phase: Building the OpenWrt Image (Phase 4).
+Next Phase: Building the OpenWrt Image (Phase 4) - Complete? (Check artifacts).
+Next: Deploy Beryl Routerd.

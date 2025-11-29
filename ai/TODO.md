@@ -145,5 +145,5 @@
 
 - [ ] Install bpf-linker on Fedora
 - [x] Install aarch64 cross-compiler (via Docker)
-- [x] Verify full build pipeline
+- [ ] Verify full build pipeline
 - [ ] CI setup (GitHub Actions)

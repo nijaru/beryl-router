@@ -186,9 +186,9 @@ impl Router {
         if let Some(server_config) = &config.server {
             if server_config.enabled {
                 let db = Arc::new(RwLock::new(LeaseDatabase::new(
-                    &server_config.pool,
-                    &server_config.static_leases,
+                    server_config.pool.clone(),
                     server_config.lease_file.clone(),
+                    &server_config.static_leases,
                 )));
                 self.lease_db = Some(db.clone());
 

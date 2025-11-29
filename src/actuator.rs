@@ -55,7 +55,7 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
         .context(format!("Failed to execute {} {:?}", cmd, args))?;
 
     if !status.success() {
-        warn!("Command {} {:?}" returned non-zero exit code", cmd, args);
+        warn!("Command {} {:?} returned non-zero exit code", cmd, args);
         // Don't hard fail on commands like "ip route del" if route doesn't exist
         if cmd == "ip" && args.first() == Some(&"addr") {
              return Err(anyhow::anyhow!("Command failed: {} {:?}", cmd, args));
