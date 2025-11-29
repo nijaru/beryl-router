@@ -112,15 +112,21 @@
 - [ ] UPnP/NAT-PMP
 - [ ] DDNS client
 
-## Phase 4: Polish
+## Phase 4: Polish & Cleanup
 
-### 4.1 CLI Tool
+### 4.1 Code Quality
+- [ ] Run `cargo clippy -- -D clippy::pedantic` and fix warnings
+- [ ] Add unit tests for `beryl-config` (parsing logic)
+- [ ] Add unit tests for `beryl-dhcp` (lease allocation)
+- [ ] Refactor `src/main.rs` if needed (currently ~360 lines)
+
+### 4.2 CLI Tool
 - [ ] Create tools/beryl-cli
 - [ ] Status commands
 - [ ] Config commands
 - [ ] Client list
 
-### 4.2 Web UI
+### 4.3 Web UI
 - [ ] Create separate SPA repo (Solid or Svelte)
 - [ ] Dashboard
 - [ ] Network config
@@ -128,15 +134,13 @@
 - [ ] Client management
 - [ ] Serve static files from beryl-routerd
 
-### 4.3 Documentation
+### 4.4 Documentation
 - [ ] User guide
 - [ ] API documentation
 - [ ] OpenWrt build guide
 
-### 4.4 OpenWrt Integration
-- [x] Custom OpenWrt image with BTF
-- [x] Verify BTF in vmlinux
-- [ ] Flash image to router
+### 4.5 OpenWrt Integration
+- [ ] Custom OpenWrt image with BTF
 - [ ] Package (ipk) creation
 - [ ] procd init script
 - [ ] UCI integration (optional)
@@ -144,6 +148,6 @@
 ## Build System
 
 - [ ] Install bpf-linker on Fedora
-- [x] Install aarch64 cross-compiler (via Docker)
+- [ ] Install aarch64 cross-compiler
 - [ ] Verify full build pipeline
 - [ ] CI setup (GitHub Actions)
