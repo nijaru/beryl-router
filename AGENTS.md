@@ -77,6 +77,7 @@ docker compose exec dev bash
 | Check | Native Command | Docker Command | Notes |
 |-------|----------------|----------------|-------|
 | Workspace check | `cargo check` | `docker compose exec dev cargo check` | Native fails on macOS (aya needs Linux) |
+| Clippy Pedantic | `cargo clippy --workspace -- -W clippy::pedantic` | `docker compose exec dev cargo clippy --workspace -- -W clippy::pedantic` | **Mandatory** for all changes |
 | eBPF build | `cargo xtask build-ebpf` | `docker compose exec dev cargo xtask build-ebpf` | Requires bpf-linker |
 | Cross-compile | `cargo xtask build ...` | `docker compose exec dev cargo xtask build ...` | Target: aarch64-unknown-linux-musl |
 

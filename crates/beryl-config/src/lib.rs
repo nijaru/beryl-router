@@ -1,5 +1,5 @@
 use beryl_common::FirewallConfig;
-use beryl_dhcp::ServerConfig as DhcpServerConfig;
+use beryl_dhcp::{ClientConfig as DhcpClientConfig, ServerConfig as DhcpServerConfig};
 use beryl_dns::DnsConfig;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -112,6 +112,8 @@ pub struct InterfaceConfig {
 pub struct DhcpConfig {
     #[serde(default)]
     pub server: Option<DhcpServerConfig>,
+    #[serde(default)]
+    pub client: Option<DhcpClientConfig>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

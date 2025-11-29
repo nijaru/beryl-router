@@ -54,6 +54,11 @@ impl Server {
         Self { config, db }
     }
 
+    /// Runs the DHCP server loop.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the socket cannot be bound or if packet handling fails.
     pub async fn run(&mut self) -> anyhow::Result<()> {
         if !self.config.enabled {
             tracing::info!("DHCP Server disabled");
@@ -102,9 +107,8 @@ impl Server {
         }
 
         // Extract message type option
-        let msg_type = match msg.opts().get(v4::OptionCode::MessageType) {
-            Some(v4::DhcpOption::MessageType(t)) => t,
-            _ => return Ok(()), // Ignore if no message type
+        let Some(v4::DhcpOption::MessageType(msg_type)) = msg.opts().get(v4::OptionCode::MessageType) else {
+             return Ok(());
         };
 
         tracing::debug!("DHCP Message Type: {:?}", msg_type);
@@ -152,7 +156,7 @@ impl Server {
                 .opts_mut()
                 .insert(v4::DhcpOption::ServerIdentifier(self.get_server_ip()));
             offer.opts_mut().insert(v4::DhcpOption::AddressLeaseTime(
-                db.get_duration().as_secs() as u32,
+                u32::try_from(db.get_duration().as_secs()).unwrap_or(u32::MAX),
             ));
             offer
                 .opts_mut()
@@ -193,10 +197,10 @@ impl Server {
 
         // Or verify 'ciaddr' (client IP) for renewals
         let target_ip = req_ip.or_else(|| {
-            if !msg.ciaddr().is_unspecified() {
-                Some(msg.ciaddr())
-            } else {
+            if msg.ciaddr().is_unspecified() {
                 None
+            } else {
+                Some(msg.ciaddr())
             }
         });
 
@@ -219,7 +223,7 @@ impl Server {
                     ack.opts_mut()
                         .insert(v4::DhcpOption::ServerIdentifier(self.get_server_ip()));
                     ack.opts_mut().insert(v4::DhcpOption::AddressLeaseTime(
-                        db.get_duration().as_secs() as u32,
+                        u32::try_from(db.get_duration().as_secs()).unwrap_or(u32::MAX),
                     ));
                     ack.opts_mut()
                         .insert(v4::DhcpOption::SubnetMask(Ipv4Addr::new(255, 255, 255, 0)));

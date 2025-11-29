@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use aya::maps::{HashMap, PerCpuArray};
 use beryl_common::{FirewallConfig, PacketAction, Stats};
 use beryl_config::Config;
-use beryl_dhcp::{Server as DhcpServer, database::LeaseDatabase};
+use beryl_dhcp::{Client as DhcpClient, ClientConfig, Server as DhcpServer, database::LeaseDatabase};
 use beryl_dns::DnsServer;
 use beryl_ebpf::BerylEbpf;
 use beryl_wifi::apply_wifi_config;
@@ -22,6 +22,7 @@ use tokio::{
 use tracing::{Level, debug, error, info};
 use tracing_subscriber::FmtSubscriber;
 
+mod actuator;
 mod api;
 
 #[derive(Debug, Parser)]
@@ -52,6 +53,7 @@ pub struct Router {
     ebpf: BerylEbpf,
     config_path: PathBuf,
     dhcp_handle: Option<JoinHandle<()>>,
+    dhcp_client_handle: Option<JoinHandle<()>>,
     dns_handle: Option<JoinHandle<()>>,
     current_config: Option<Config>,
     // Shared state between DHCP and DNS
@@ -74,6 +76,7 @@ impl Router {
             ebpf,
             config_path: args.config.clone(),
             dhcp_handle: None,
+            dhcp_client_handle: None,
             dns_handle: None,
             current_config: None,
             lease_db: None,
@@ -174,20 +177,14 @@ impl Router {
     }
 
     pub async fn apply_dhcp_config(&mut self, config: &beryl_config::DhcpConfig) -> Result<()> {
-        // Stop existing DHCP server if running
+        // --- DHCP Server Handling ---
         if let Some(handle) = self.dhcp_handle.take() {
-            handle.abort(); // Simple cancellation
+            handle.abort();
             info!("Stopped existing DHCP server");
         }
 
-        // Initialize shared lease DB if needed (or reuse existing if valid strategy)
-        // Ideally we keep the DB alive across reloads to persist leases in memory
-        // But if pool config changes drastically, we might need to re-init.
-        // For now, let's re-init if config exists.
-
         if let Some(server_config) = &config.server {
             if server_config.enabled {
-                // Create new DB instance based on new config
                 let db = Arc::new(RwLock::new(LeaseDatabase::new(
                     &server_config.pool,
                     &server_config.static_leases,
@@ -206,6 +203,40 @@ impl Router {
             } else {
                 self.lease_db = None;
             }
+        }
+
+        // --- DHCP Client Handling ---
+        if let Some(handle) = self.dhcp_client_handle.take() {
+            handle.abort();
+            info!("Stopped existing DHCP client");
+        }
+
+        if let Some(client_config) = &config.client {
+            info!("Starting DHCP client on {}", client_config.interface);
+            let config = client_config.clone();
+            let handle = tokio::spawn(async move {
+                let mut client = DhcpClient::new(config.clone());
+                loop {
+                    match client.acquire().await {
+                        Ok(lease) => {
+                            info!("DHCP Lease acquired: {}/{}", lease.ip, lease.netmask);
+                            if let Err(e) = actuator::NetworkActuator::apply_lease(&config.interface, &lease) {
+                                error!("Failed to apply DHCP lease: {}", e);
+                            }
+                            
+                            // Renewal logic (simple sleep for 50% of lease time)
+                            let sleep_time = Duration::from_secs((lease.lease_time / 2).into());
+                            debug!("Sleeping for {:?} before renewal", sleep_time);
+                            tokio::time::sleep(sleep_time).await;
+                        }
+                        Err(e) => {
+                            error!("DHCP acquire failed: {}. Retrying in 5s...", e);
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            });
+            self.dhcp_client_handle = Some(handle);
         }
 
         Ok(())

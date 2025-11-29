@@ -35,20 +35,30 @@
 | DNS server | Code complete | Forwarding + Local Hostname resolution |
 | Local DNS | Code complete | Resolves names from DHCP leases |
 | WiFi manager | Code complete | Generates OpenWrt config + reload |
-| OpenWrt image | Not started | Requires custom build with BTF |
+| DHCP Client | Complete | Integrated with netlink/ip commands |
+| OpenWrt image | Complete | Built with BTF. Artifact ready. |
 
 ## Blockers
 
 | Blocker | Impact | Resolution |
 |---------|--------|------------|
-| No BTF-enabled OpenWrt | Cannot test on device | Build custom image |
+| Testing Hardware | Cannot verify eBPF | Flash custom image to router |
 
 ## Recent Commits
 
-- feat: Implement DNS server (forwarding) using hickory-dns
-- feat: Implement Local DNS resolution via shared lease DB
-- feat: Implement WiFi management (OpenWrt config generation)
-- infra: Fix Docker dev environment for macOS
+- build: Compiled OpenWrt 23.05 image with CONFIG_DEBUG_INFO_BTF=y
+- feat: Integrated DHCP Client with system actuator
+- infra: Setup Docker/Podman build environment
+
+## Artifacts
+
+- **Firmware Image:** `build/openwrt/bin/targets/mediatek/filogic/openwrt-mediatek-filogic-glinet_gl-mt3000-squashfs-sysupgrade.bin`
+- **Flash Method:**
+    1. **Web UI:** `http://192.168.8.1` -> Upgrade -> Local Upgrade (Uncheck 'Keep Settings').
+    2. **U-Boot:** Hold Reset 10s on boot -> `http://192.168.1.1` (PC IP: 192.168.1.2).
+
+## Active Work
+Next: Cross-compile `beryl-routerd` and deploy.
 
 ## User Context
 

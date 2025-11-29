@@ -8,195 +8,194 @@ use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lease {
+    pub mac: String,
     pub ip: Ipv4Addr,
-    pub mac: Vec<u8>,
-    pub expires_at: SystemTime,
     pub hostname: Option<String>,
+    pub expires_at: SystemTime,
 }
 
 pub struct LeaseDatabase {
-    leases: HashMap<Vec<u8>, Lease>, // MAC -> Lease
-    pool_start: u32,
-    pool_end: u32,
-    static_leases: HashMap<Vec<u8>, Ipv4Addr>,
-    lease_duration: Duration,
+    leases: HashMap<Ipv4Addr, Lease>,
+    pool: PoolConfig,
     storage_path: Option<PathBuf>,
+    static_leases: HashMap<String, Ipv4Addr>, // MAC -> IP
 }
 
 impl LeaseDatabase {
-    pub fn new(
-        pool: &PoolConfig,
-        static_leases: &[StaticLease],
-        storage_path: Option<PathBuf>,
-    ) -> Self {
-        let mut sl_map = HashMap::new();
-        for sl in static_leases {
-            if let Ok(mac_bytes) = parse_mac(&sl.mac) {
-                sl_map.insert(mac_bytes, sl.ip);
-            }
+    #[must_use]
+    pub fn new(pool: PoolConfig, storage_path: Option<PathBuf>, static_leases_vec: &[StaticLease]) -> Self {
+        let mut static_leases = HashMap::new();
+        for sl in static_leases_vec {
+            static_leases.insert(sl.mac.to_lowercase(), sl.ip);
         }
 
-        let lease_duration =
-            parse_duration(&pool.lease_time).unwrap_or(Duration::from_secs(12 * 3600));
-
-        let mut db = Self {
+        Self {
             leases: HashMap::new(),
-            pool_start: u32::from(pool.start),
-            pool_end: u32::from(pool.end),
-            static_leases: sl_map,
-            lease_duration,
+            pool,
             storage_path,
-        };
-
-        if let Err(e) = db.load() {
-            tracing::warn!("Failed to load leases: {}", e);
+            static_leases,
         }
-
-        db
     }
 
+    #[must_use]
+    pub fn available(&self, ip: Ipv4Addr) -> bool {
+        // Check if in pool range
+        if ip < self.pool.start || ip > self.pool.end {
+            return false;
+        }
+
+        // Check if taken by static lease
+        if self.static_leases.values().any(|&x| x == ip) {
+            return false;
+        }
+
+        // Check if active dynamic lease exists
+        if let Some(lease) = self.leases.get(&ip) 
+            && lease.expires_at > SystemTime::now() {
+            return false;
+        }
+
+        true
+    }
+
+    /// Load leases from persistent storage
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the storage file exists but cannot be read or if the
+    /// JSON content is invalid.
     pub fn load(&mut self) -> anyhow::Result<()> {
-        if let Some(path) = &self.storage_path {
-            if path.exists() {
-                let content = fs::read_to_string(path)?;
-                let stored_leases: Vec<Lease> = serde_json::from_str(&content)?;
-                for lease in stored_leases {
-                    // Only keep valid leases? Or keep expired ones too?
-                    // For now, load everything.
-                    self.leases.insert(lease.mac.clone(), lease);
+        if let Some(path) = &self.storage_path 
+            && path.exists() 
+        {
+            let content = fs::read_to_string(path)?;
+            let stored_leases: Vec<Lease> = serde_json::from_str(&content)?;
+            
+            for lease in stored_leases {
+                // Only load valid leases
+                if lease.expires_at > SystemTime::now() {
+                    self.leases.insert(lease.ip, lease);
                 }
-                tracing::info!("Loaded {} leases from storage", self.leases.len());
             }
+            tracing::info!("Loaded {} leases from storage", self.leases.len());
         }
         Ok(())
     }
 
+    /// Save current leases to persistent storage
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the storage path is defined but the file cannot be written
+    /// or if the lease data cannot be serialized to JSON.
     pub fn save(&self) -> anyhow::Result<()> {
         if let Some(path) = &self.storage_path {
-            let leases_vec: Vec<&Lease> = self.leases.values().collect();
-            let content = serde_json::to_string_pretty(&leases_vec)?;
+            // Prune expired before saving
+            let valid_leases: Vec<&Lease> = self.leases.values()
+                .filter(|l| l.expires_at > SystemTime::now())
+                .collect();
+            
+            let content = serde_json::to_string_pretty(&valid_leases)?;
             fs::write(path, content)?;
         }
         Ok(())
     }
 
+    #[must_use]
     pub fn get_lease(&self, mac: &[u8]) -> Option<&Lease> {
-        self.leases.get(mac)
+        let mac_str = mac_to_string(mac);
+        self.leases.values().find(|l| l.mac == mac_str)
     }
 
+    /// Allocates an IP for the given MAC address.
+    ///
+    /// If the MAC has a static lease, that IP is returned.
+    /// If `requested_ip` is provided and valid/available, it is used.
+    /// Otherwise, the next available IP in the pool is assigned.
+    ///
+    /// Returns `None` if the pool is exhausted.
     pub fn allocate_ip(&mut self, mac: &[u8], requested_ip: Option<Ipv4Addr>) -> Option<Lease> {
-        let lease = self.allocate_ip_internal(mac, requested_ip)?;
+        let mac_str = mac_to_string(mac);
+        let duration = Self::parse_duration(&self.pool.lease_time);
+        
+        // 1. Check static leases
+        let ip = if let Some(&static_ip) = self.static_leases.get(&mac_str) {
+            static_ip
+        } else if let Some(req) = requested_ip 
+             && self.available(req) {
+            // 2. Try requested IP
+            req
+        } else {
+            // 3. Pick next available
+            let mut current: u32 = self.pool.start.into();
+            let end: u32 = self.pool.end.into();
+            let mut found = None;
 
+            while current <= end {
+                let candidate = Ipv4Addr::from(current);
+                if self.available(candidate) {
+                    found = Some(candidate);
+                    break;
+                }
+                current += 1;
+            }
+            found?
+        };
+
+        let lease = Lease {
+            mac: mac_str,
+            ip,
+            hostname: None, // Hostname is updated separately if needed
+            expires_at: SystemTime::now() + duration,
+        };
+
+        self.leases.insert(ip, lease.clone());
         if let Err(e) = self.save() {
-            tracing::error!("Failed to persist lease: {}", e);
+            tracing::error!("Failed to save lease database: {}", e);
         }
 
         Some(lease)
     }
 
-    fn allocate_ip_internal(
-        &mut self,
-        mac: &[u8],
-        requested_ip: Option<Ipv4Addr>,
-    ) -> Option<Lease> {
-        // 1. Check static leases
-        if let Some(&ip) = self.static_leases.get(mac) {
-            let lease = Lease {
-                ip,
-                mac: mac.to_vec(),
-                expires_at: SystemTime::now() + self.lease_duration,
-                hostname: None,
-            };
-            self.leases.insert(mac.to_vec(), lease.clone());
-            return Some(lease);
+    fn parse_duration(s: &str) -> Duration {
+        // Simple parser: "12h", "30m", "3600"
+        if let Some(stripped) = s.strip_suffix('h') 
+            && let Ok(hours) = stripped.parse::<u64>() {
+            return Duration::from_secs(hours * 3600);
         }
-
-        // 2. Check existing lease
-        if let Some(lease) = self.leases.get(mac) {
-            let mut new_lease = lease.clone();
-            new_lease.expires_at = SystemTime::now() + self.lease_duration;
-            self.leases.insert(mac.to_vec(), new_lease.clone());
-            return Some(new_lease);
+        if let Some(stripped) = s.strip_suffix('m') 
+            && let Ok(mins) = stripped.parse::<u64>() {
+            return Duration::from_secs(mins * 60);
         }
-
-        // 3. Allocate new dynamic IP
-        // Try requested IP first if in pool and available
-        if let Some(req) = requested_ip {
-            let req_u32 = u32::from(req);
-            if req_u32 >= self.pool_start && req_u32 <= self.pool_end && !self.is_ip_taken(req) {
-                let lease = Lease {
-                    ip: req,
-                    mac: mac.to_vec(),
-                    expires_at: SystemTime::now() + self.lease_duration,
-                    hostname: None,
-                };
-                self.leases.insert(mac.to_vec(), lease.clone());
-                return Some(lease);
-            }
+        if let Ok(secs) = s.parse::<u64>() {
+            return Duration::from_secs(secs);
         }
-
-        // Find first free IP
-        for ip_u32 in self.pool_start..=self.pool_end {
-            let ip = Ipv4Addr::from(ip_u32);
-            if !self.is_ip_taken(ip) {
-                let lease = Lease {
-                    ip,
-                    mac: mac.to_vec(),
-                    expires_at: SystemTime::now() + self.lease_duration,
-                    hostname: None,
-                };
-                self.leases.insert(mac.to_vec(), lease.clone());
-                return Some(lease);
-            }
-        }
-
-        None // Pool exhausted
+        Duration::from_secs(3600) // Default 1h
     }
 
-    fn is_ip_taken(&self, ip: Ipv4Addr) -> bool {
-        // Check active leases
-        if self
-            .leases
-            .values()
-            .any(|l| l.ip == ip && l.expires_at > SystemTime::now())
-        {
-            return true;
-        }
-        // Check static leases (reverse check)
-        if self.static_leases.values().any(|&sip| sip == ip) {
-            return true;
-        }
-        false
-    }
-
+    #[must_use]
     pub fn get_duration(&self) -> Duration {
-        self.lease_duration
+        Self::parse_duration(&self.pool.lease_time)
     }
 
+    #[must_use]
     pub fn get_ip_by_hostname(&self, hostname: &str) -> Option<Ipv4Addr> {
-        // Check static leases
-        for lease in self.static_leases.iter() {
-            // Static leases map is MAC -> IP. We don't have hostname in the map value.
-            // We need to look up the original config or store hostname in static lease map.
-            // Current static_leases map is HashMap<Vec<u8>, Ipv4Addr>.
-            // We need to change the map value or iterate the source list if possible.
-            // But we don't have the source list here.
-            // Let's check dynamic/active leases first as they are full Lease objects.
-            if let Some(l) = self.leases.get(lease.0) {
-                if let Some(h) = &l.hostname {
-                    if h.eq_ignore_ascii_case(hostname) {
-                        return Some(l.ip);
-                    }
-                }
-            }
+        // Check static leases first
+        for lease in &self.static_leases {
+             if let Some(l) = self.leases.get(lease.1) 
+                 && let Some(h) = &l.hostname 
+                 && h.eq_ignore_ascii_case(hostname) 
+             {
+                    return Some(l.ip);
+             }
         }
 
-        // Check all active leases
+        // Check dynamic leases
         for lease in self.leases.values() {
-            if let Some(h) = &lease.hostname {
-                if h.eq_ignore_ascii_case(hostname) {
-                    return Some(lease.ip);
-                }
+            if let Some(h) = &lease.hostname 
+                && h.eq_ignore_ascii_case(hostname) 
+            {
+                return Some(lease.ip);
             }
         }
 
@@ -204,26 +203,9 @@ impl LeaseDatabase {
     }
 }
 
-fn parse_mac(s: &str) -> Result<Vec<u8>, ()> {
-    let bytes: Result<Vec<u8>, _> = s
-        .split(':')
-        .map(|part| u8::from_str_radix(part, 16))
-        .collect();
-    bytes.map_err(|_| ())
-}
-
-fn parse_duration(s: &str) -> Option<Duration> {
-    // Basic parsing: "12h", "30m", "60s"
-    let len = s.len();
-    if len < 2 {
-        return None;
-    }
-    let (val, unit) = s.split_at(len - 1);
-    let val = val.parse::<u64>().ok()?;
-    match unit {
-        "h" => Some(Duration::from_secs(val * 3600)),
-        "m" => Some(Duration::from_secs(val * 60)),
-        "s" => Some(Duration::from_secs(val)),
-        _ => None,
-    }
+fn mac_to_string(mac: &[u8]) -> String {
+    mac.iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<Vec<_>>()
+        .join(":")
 }

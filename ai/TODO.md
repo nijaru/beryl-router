@@ -79,10 +79,10 @@
 - [x] Integrate with DNS (hostname → IP)
 
 ### 2.2 DHCP Client
-- [ ] WAN interface DHCP client
-- [ ] Lease renewal handling
-- [ ] Trigger network reconfiguration on change
-- [ ] Update default route, DNS
+- [x] WAN interface DHCP client
+- [x] Lease renewal handling
+- [x] Trigger network reconfiguration on change
+- [x] Update default route, DNS
 
 ### 2.3 DNS Server
 - [x] Add crates/beryl-dns
@@ -99,7 +99,7 @@
 - [x] Add crates/beryl-wifi
 - [x] hostapd config generation (OpenWrt UCI)
 - [x] hostapd process management (via wifi reload)
-- [ ] Multiple SSID support
+- [x] Multiple SSID support
 - [ ] Client list from hostapd_cli
 
 ### 3.2 Operating Modes
@@ -134,7 +134,9 @@
 - [ ] OpenWrt build guide
 
 ### 4.4 OpenWrt Integration
-- [ ] Custom OpenWrt image with BTF
+- [x] Custom OpenWrt image with BTF
+- [x] Verify BTF in vmlinux
+- [ ] Flash image to router
 - [ ] Package (ipk) creation
 - [ ] procd init script
 - [ ] UCI integration (optional)
@@ -142,6 +144,6 @@
 ## Build System
 
 - [ ] Install bpf-linker on Fedora
-- [ ] Install aarch64 cross-compiler
-- [ ] Verify full build pipeline
+- [x] Install aarch64 cross-compiler (via Docker)
+- [x] Verify full build pipeline
 - [ ] CI setup (GitHub Actions)
