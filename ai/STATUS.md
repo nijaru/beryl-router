@@ -1,5 +1,22 @@
 # Status
 
+## Handover Context (macOS → Linux)
+
+**Last Session Date:** 2025-11-29
+**Last Machine:** macOS (nick@apple)
+**Next Step:** Build the custom OpenWrt image on Fedora.
+
+### Instructions for `nick@fedora`
+
+1.  **Pull changes:** `git pull`
+2.  **Setup Buildroot:** Clone OpenWrt (or GL.iNet SDK) for MT7981.
+3.  **Configure Kernel:** Run `make kernel_menuconfig` and enable:
+    - `CONFIG_DEBUG_INFO_BTF=y`
+    - `CONFIG_BPF_SYSCALL=y`
+4.  **Build:** `make -j$(nproc)`
+5.  **Flash:** Flash the resulting image to the GL-MT3000.
+6.  **Deploy:** `scp` the `beryl-routerd` binary (built via `cargo xtask`) to the router and test.
+
 ## Current State
 
 | Aspect | Status | Notes |

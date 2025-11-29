@@ -76,7 +76,7 @@
 - [x] IP pool management
 - [x] Lease storage (persist to file)
 - [x] Static lease support
-- [ ] Integrate with DNS (hostname → IP)
+- [x] Integrate with DNS (hostname → IP)
 
 ### 2.2 DHCP Client
 - [ ] WAN interface DHCP client
@@ -85,20 +85,20 @@
 - [ ] Update default route, DNS
 
 ### 2.3 DNS Server
-- [ ] Add crates/beryl-dns
-- [ ] Evaluate hickory-dns vs custom
-- [ ] Forwarding resolver
-- [ ] Response caching
-- [ ] Local hostname resolution (from DHCP)
+- [x] Add crates/beryl-dns
+- [x] Evaluate hickory-dns vs custom
+- [x] Forwarding resolver
+- [x] Response caching (Basic via Hickory)
+- [x] Local hostname resolution (from DHCP)
 - [ ] Blocklist filtering
 - [ ] Blocklist auto-update
 
 ## Phase 3: WiFi & Advanced
 
 ### 3.1 WiFi Manager
-- [ ] Add crates/beryl-wifi
-- [ ] hostapd config generation
-- [ ] hostapd process management
+- [x] Add crates/beryl-wifi
+- [x] hostapd config generation (OpenWrt UCI)
+- [x] hostapd process management (via wifi reload)
 - [ ] Multiple SSID support
 - [ ] Client list from hostapd_cli
 
